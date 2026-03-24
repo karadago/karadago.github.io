@@ -36,10 +36,12 @@ a:visited {
 nav {
     margin-bottom: 20px;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 nav a {
     margin-right: 15px;
+    white-space: nowrap;
 }
 
 hr {
