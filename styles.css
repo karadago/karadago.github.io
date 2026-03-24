@@ -51,3 +51,22 @@ hr {
 ul {
     padding-left: 20px;
 }
+
+.retro-counter {
+    display: inline-flex;
+    background-color: #000000;
+    padding: 3px;
+    border: 3px inset #888888; /* Gives it a 3D sunken frame */
+    vertical-align: middle;
+}
+
+.retro-counter .digit {
+    background-color: #000000;
+    color: #ffffff; /* White text on black background */
+    font-family: "Courier New", Courier, monospace;
+    font-size: 18px;
+    font-weight: bold;
+    padding: 2px 4px;
+    border: 1px solid #333333; /* Separates the numbers like rolling dials */
+    margin: 0 1px;
+}
