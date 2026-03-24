@@ -1,0 +1,41 @@
+body {
+    font-family: "Times New Roman", Times, serif;
+    background-color: #ffffff;
+    color: #000000;
+    line-height: 1.4;
+    max-width: 800px; /* Keeps line lengths readable */
+    margin: 0 auto;
+    padding: 20px;
+}
+
+h1, h2, h3 {
+    font-family: Arial, sans-serif; /* Classic 90s header contrast */
+}
+
+a {
+    color: #0000ee;
+    text-decoration: underline;
+}
+
+a:visited {
+    color: #551a8b;
+}
+
+nav {
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+nav a {
+    margin-right: 15px;
+}
+
+hr {
+    border: 0;
+    border-bottom: 2px solid #000;
+    margin: 20px 0;
+}
+
+ul {
+    padding-left: 20px;
+}
