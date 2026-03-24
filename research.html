@@ -18,6 +18,12 @@
     </nav>
     <hr>
 
+    <h2>Research Impact</h2>
+    <p>
+        <strong>Total Scopus Citations:</strong> 
+        <span id="citation-counter" class="retro-counter">Loading...</span>
+    </p>
+    
     <h2>Publications</h2>
     <ul>
         <li>Karadağ, Ö., Basaran Bundur, Z., Çakır, Ö. and Bilir, T. (2025). “Evaluation of strength and electrical resistivity in cement mortars incorporating different biomass ashes.” Discover Sustainability, 6(1), 1-20. DOI: <a href="https://doi.org/10.1007/s43621-025-01393-5" target="_blank">10.1007/s43621-025-01393-5</a> </li>
@@ -28,5 +34,25 @@
     <h2>Current Projects</h2>
     <p><strong>Scientometrics of Architecture and Civil Engineering:</strong> A comparative analysis of literature utilizing Web of Science and Scopus databases to map the evolution and intersections of these fields.</p>
 
+    <script>
+        fetch('citations.json')
+            .then(response => response.json())
+            .then(data => {
+                const counterDiv = document.getElementById('citation-counter');
+                counterDiv.innerHTML = ''; 
+                
+                const countStr = data.total_citations.toString().padStart(5, '0');
+                
+                for (let char of countStr) {
+                    const span = document.createElement('span');
+                    span.className = 'digit';
+                    span.innerText = char;
+                    counterDiv.appendChild(span);
+                }
+            })
+            .catch(error => {
+                document.getElementById('citation-counter').innerText = "[Error loading data]";
+            });
+    </script>
 </body>
 </html>
