@@ -70,3 +70,17 @@ ul {
     border: 1px solid #333333; /* Separates the numbers like rolling dials */
     margin: 0 1px;
 }
+
+.badge-new {
+  background: black;
+  color: white;
+  font-size: 0.7em;
+  padding: 1px 5px;
+  font-family: monospace;
+  vertical-align: middle;
+  animation: blink 1.2s step-start infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
