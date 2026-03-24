@@ -3,8 +3,16 @@ body {
     background-color: #ffffff;
     color: #000000;
     line-height: 1.4;
-    max-width: 1200px;
+    max-width: 800px;
+    margin: 0 auto;
     padding: 20px;
+}
+
+.profile-pic {
+    float: right;      
+    margin-left: 20px;  
+    margin-bottom: 15px;
+    border: 2px solid #000;
 }
 
 h1 {
