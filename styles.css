@@ -1,15 +1,19 @@
 body {
-    font-family: "Times New Roman", Times, serif;
+    font-family: "Courier New", Courier, monospace; 
     background-color: #ffffff;
     color: #000000;
     line-height: 1.4;
-    max-width: 800px; /* Keeps line lengths readable */
-    margin: 0 auto;
+    max-width: 800px;
     padding: 20px;
 }
 
-h1, h2, h3 {
-    font-family: Arial, sans-serif; /* Classic 90s header contrast */
+h1 {
+    font-family: "Courier New", Courier, monospace;
+    text-align: right; /* 
+}
+
+h2, h3 {
+    font-family: "Courier New", Courier, monospace; 
 }
 
 a {
