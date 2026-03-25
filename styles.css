@@ -85,6 +85,10 @@ ul {
   animation: blink 1.2s step-start infinite;
 }
 
+.ai {
+  font-size: 1.5em;
+}
+
 @keyframes blink {
   50% { opacity: 0; }
 }
