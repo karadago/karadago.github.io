@@ -96,15 +96,6 @@ ul {
   font-size: 1.5em;
 }
 
-@media (max-width: 600px) {
-  .profile-pic {
-    float: none;
-    display: block;
-    margin: 0 auto 15px auto;
-    width: 150px;
-  }
-}
-
 @keyframes blink {
   50% { opacity: 0; }
 }
