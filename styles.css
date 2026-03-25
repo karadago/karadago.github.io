@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+
 body {
-    font-family: "Garamond"; 
+    font-family: "IBM Plex Serif", serif; 
     background-color: #ffffff;
     color: #000000;
     line-height: 1.4;
@@ -16,12 +18,12 @@ body {
 }
 
 h1 {
-    font-family: "Courier New", Courier, monospace;
-    text-align: right; /* 
+    font-family: "IBM Plex Mono", monospace;
+    text-align: right; 
 }
 
 h2, h3 {
-    font-family: "Courier New", Courier, monospace; 
+    font-family: "IBM Plex Mono", monospace;
 }
 
 a {
