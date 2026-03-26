@@ -96,6 +96,15 @@ ul {
   font-size: 1.5em;
 }
 
+.social-icons a {
+  margin-right: 15px;
+}
+
+#social-large .ai,
+#social-large .fab {
+  font-size: 2em;
+}
+
 @keyframes blink {
   50% { opacity: 0; }
 }
