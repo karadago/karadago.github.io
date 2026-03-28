@@ -105,6 +105,26 @@ ul {
   font-size: 1.8em;
 }
 
+.latex-logo {
+  font-family: "Times New Roman", Times, serif;
+  display: inline-block;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.latex-logo sup {
+  font-size: 0.7em;
+  vertical-align: 0.25em;
+  margin-left: -0.36em;
+  margin-right: -0.15em;
+}
+
+.latex-logo sub {
+  font-size: 1em;
+  vertical-align: -0.2ex;
+  margin-left: -0.1667em;
+  margin-right: -0.125em;
+}
+
 @keyframes blink {
   50% { opacity: 0; }
 }
