@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="noindex, nofollow, width=device-width, initial-scale=1.0">
+    <title>Waffle Slab Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 750px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .hero-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 20px;
+            display: block;
+        }
+        .disclaimer {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .fixed-info {
+            background-color: #e2e3e5;
+            color: #383d41;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-around;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            font-weight: bold;
+            flex: 1;
+        }
+        input[type="number"] {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .info-text {
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .text-red {
+            color: #d32f2f;
+            font-weight: 600;
+        }
+        .error-message {
+            color: #d32f2f;
+            background-color: #f8d7da;
+            padding: 10px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            font-size: 0.95em;
+            font-weight: bold;
+            margin-top: 10px;
+            display: none;
+        }
+        .result-group {
+            display: flex;
+            justify-content: flex-start;
+            gap: 15px; 
+            padding: 8px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .result-group:last-child {
+            border-bottom: none;
+        }
+        .result-label {
+            min-width: 250px;
+        }
+        .visual-container {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+            text-align: center;
+        }
+        svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Waffle Slab Calculator</h2>
+
+    <img src="https://structurepoint.org/pdfs/Two-Way-Joist-Concrete-Waffle-Slab-Floor-Design-Detailing_files/image002.png" alt="Waffle Slab Diagram" class="hero-image">
+
+    <div class="disclaimer">
+        <strong>Disclaimer:</strong> This calculator is only applicable for RC waffle slab systems. Please note that this tool is only for preliminary structural design and not exact. Please use this tool RESPONSIBLY. 
+    </div>
+
+    <div class="fixed-info">
+        <span>🔒 Plate Thickness: 10 cm</span>
+        <span>🔒 Rib Spacing: 90 cm</span>
+    </div>
+
+    <div class="section">
+        <div class="form-group">
+            <label>Span Length [cm]:</label>
+            <input type="number" id="spanLength" oninput="calculateAll()">
+        </div>
+        <div id="spanError" class="error-message"></div>
+        
+        <div class="form-group" id="storyHeightGroup" style="display: none;">
+            <label>Story Height [cm]:</label>
+            <input type="number" id="storyHeight" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <div class="section" id="depthSection" style="display: none;">
+        <span class="info-text text-red" id="suggestedDepthText">Suggested total depth (L/24): -- cm</span>
+        <div class="form-group">
+            <label>Determined Total Depth [cm]:</label>
+            <input type="number" id="userDepth" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <div class="section" id="ribSection" style="display: none;">
+        <span class="info-text text-red" id="suggestedRibText">Suggested rib width [(Depth - 10) / 2]: -- cm</span>
+        <div class="form-group">
+            <label>Determined Rib Width [cm]:</label>
+            <input type="number" id="userRibWidth" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <div class="section" id="resultsSection" style="display: none;">
+        <h3>Column Properties (Square)</h3>
+        <div class="result-group">
+            <span class="result-label">Suggested Column Side:</span>
+            <span><span id="columnSide">--</span> cm</span>
+        </div>
+
+        <div class="visual-container">
+            <h4 style="margin-bottom: 15px;">Cross-Section</h4>
+            
+            <svg id="waffleSvg" viewBox="0 0 850 350" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="arrow-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                        <path d="M 10 0 L 0 5 L 10 10 z" fill="#c0392b" />
+                    </marker>
+                    <marker id="arrow-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b" />
+                    </marker>
+                </defs>
+
+                <path d="M 50,80 
+                         L 690,80 
+                         L 690,200 
+                         L 610,200 
+                         L 610,110 
+                         L 520,110 
+                         L 520,200 
+                         L 480,200 
+                         L 480,110 
+                         L 390,110 
+                         L 390,200 
+                         L 350,200 
+                         L 350,110 
+                         L 260,110 
+                         L 260,200 
+                         L 220,200 
+                         L 220,110 
+                         L 130,110 
+                         L 130,200 
+                         L 50,200 Z" 
+                      fill="#bdc3c7" stroke="#7f8c8d" stroke-width="2"/>
+
+                <line x1="710" y1="80" x2="710" y2="110" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text x="720" y="100" fill="#c0392b" font-size="14px" font-weight="bold">10 cm</text>
+                <line x1="690" y1="80" x2="715" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="690" y1="110" x2="715" y2="110" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+
+                <line x1="770" y1="80" x2="770" y2="200" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text id="svg-total-depth" x="780" y="145" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
+                <line x1="690" y1="200" x2="775" y2="200" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="715" y1="80" x2="775" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+
+                <line x1="240" y1="50" x2="370" y2="50" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text x="305" y="40" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">90 cm (Spacing)</text>
+                <line x1="240" y1="55" x2="240" y2="105" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="370" y1="55" x2="370" y2="105" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+
+                <line x1="220" y1="230" x2="260" y2="230" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text id="svg-rib-width" x="240" y="250" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
+                <line x1="220" y1="205" x2="220" y2="235" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="260" y1="205" x2="260" y2="235" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<script>
+    function calculateAll() {
+        const spanLength = parseFloat(document.getElementById('spanLength').value);
+        const storyHeightInput = document.getElementById('storyHeight');
+        const storyHeight = parseFloat(storyHeightInput.value);
+        const spanError = document.getElementById('spanError');
+        
+        const storyHeightGroup = document.getElementById('storyHeightGroup');
+        const depthSection = document.getElementById('depthSection');
+        const ribSection = document.getElementById('ribSection');
+        const resultsSection = document.getElementById('resultsSection');
+
+// 1. Span Validation Check
+        if (!isNaN(spanLength) && spanLength > 0) {
+            if (spanLength <= 900) {
+                spanError.innerHTML = "Error: Span lengths of this scale are an overkill for waffle slabs. A standard slab with beams is recommended. You can use <a href='https://precious-fairy-bb5345.netlify.app/' target='_blank'>this calculator</a> instead.";
+                spanError.style.display = 'block';
+                
+                // Hide subsequent sections if invalid
+                storyHeightGroup.style.display = 'none';
+                depthSection.style.display = 'none';
+                ribSection.style.display = 'none';
+                resultsSection.style.display = 'none';
+                return; // Stop calculation
+            } else if (spanLength > 1501) {
+                spanError.innerHTML = "Error: For spans that great, prestressed concrete is a better alternative.";
+                spanError.style.display = 'block';
+                
+                // Hide subsequent sections if invalid
+                storyHeightGroup.style.display = 'none';
+                depthSection.style.display = 'none';
+                ribSection.style.display = 'none';
+                resultsSection.style.display = 'none';
+                return; // Stop calculation
+            } else {
+                spanError.style.display = 'none';
+                storyHeightGroup.style.display = 'flex';
+                depthSection.style.display = 'block';
+            }
+
+            // 2. Suggest Depth
+            const suggestedDepth = (spanLength / 24).toFixed(2);
+            document.getElementById('suggestedDepthText').innerText = `Suggested total depth: ${suggestedDepth} cm`;
+        } else {
+
+            spanError.style.display = 'none';
+            storyHeightGroup.style.display = 'none';
+            depthSection.style.display = 'none';
+            ribSection.style.display = 'none';
+            resultsSection.style.display = 'none';
+            return;
+        }
+
+        // 3. Rib Width Calculation
+        const userDepth = parseFloat(document.getElementById('userDepth').value);
+        if (!isNaN(userDepth) && userDepth > 10) { // Depth must be greater than 10cm plate
+            ribSection.style.display = 'block';
+            const suggestedRib = ((userDepth - 10) / 2).toFixed(2);
+            document.getElementById('suggestedRibText').innerText = `Suggested rib width: ${suggestedRib} cm`;
+        } else {
+            ribSection.style.display = 'none';
+            resultsSection.style.display = 'none';
+            return;
+        }
+
+        // 4. Final Calculations & Visuals
+        const userRibWidth = parseFloat(document.getElementById('userRibWidth').value);
+
+        if (!isNaN(storyHeight) && storyHeight > 0 && !isNaN(userRibWidth) && userRibWidth > 0) {
+            resultsSection.style.display = 'block';
+
+            // Column Calculation Formula provided: 
+            // =(12*1.2*(story height/span length)*(((span length/20)*(span length/10)^3))/12)^(1/4)
+            const part1 = 12 * 1.2 * (storyHeight / spanLength);
+            const part2 = (spanLength / 20) * Math.pow((spanLength / 10), 3);
+            const exactSide = Math.pow((part1 * (part2 / 12)), 0.25);
+            
+            // Rounding up to the nearest 5 just like the previous calculator logic
+            const sideColumn = Math.ceil(exactSide / 5) * 5; 
+            document.getElementById('columnSide').innerText = sideColumn;
+
+            // Update SVG Labels
+            document.getElementById('svg-total-depth').textContent = userDepth + " cm";
+            document.getElementById('svg-rib-width').textContent = userRibWidth + " cm";
+
+        } else {
+            resultsSection.style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>

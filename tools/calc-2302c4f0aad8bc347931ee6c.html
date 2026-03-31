@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="noindex, nofollow, width=device-width, initial-scale=1.0">
+    <title>Preliminary Design Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .disclaimer {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .warning-box {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9em;
+            display: none; /* Hidden by default */
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            font-weight: bold;
+            flex: 1;
+        }
+        input[type="number"] {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .info-text {
+            font-size: 0.95em;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .text-red {
+            color: #d32f2f;
+            font-weight: 600;
+        }
+        .error-message {
+            color: #d32f2f;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-top: 5px;
+            display: block;
+        }
+        .result-group {
+            display: flex;
+            justify-content: flex-start;
+            gap: 15px; 
+            padding: 8px 0;
+            border-bottom: 1px dashed #ccc;
+        }
+        .result-group:last-child {
+            border-bottom: none;
+        }
+        .result-label {
+            min-width: 250px;
+        }
+        .highlight-green {
+            color: #27ae60;
+            font-weight: bold;
+        }
+        .visual-container {
+            display: flex;
+            justify-content: center; /* Centers the two boxes */
+            gap: 50px;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #eee;
+        }
+        .visual-box {
+            text-align: center;
+        }
+        .svg-container {
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Calculator</h2>
+
+    <img src="https://structurepoint.org/pdfs/Two-Way-Concrete-Floor-Slab-with-Beams-Design-Detailing_files/image002.png" style="max-width: 100%; height: auto; border-radius: 8px; margin-left: auto; margin-right: auto; margin-bottom: 20px; display: block;">
+
+    <div class="disclaimer">
+        <strong>Disclaimer:</strong> This calculator is only applicable for reinforced concrete structural systems and slabs with beams. It is only applicable to low-rise buildings. Please note that this tool is only for preliminary structural design and not exact. Please use this tool RESPONSIBLY.
+    </div>
+
+    <div class="section">
+        <div class="form-group">
+            <label>Story Height [cm]:</label>
+            <input type="number" id="storyHeight" oninput="calculateAll()">
+        </div>
+        <div class="form-group">
+            <label>Generic Span Length [cm]:</label>
+            <input type="number" id="spanLength" oninput="calculateAll()">
+        </div>
+        <span class="error-message" id="spanError"></span>
+        <div class="warning-box" id="proportionalWarning">
+            <strong>Warning:</strong> The generic span and the story height are disproportional. You might want to check either the generic span length, or the story height.
+        </div>
+    </div>
+
+    <div class="section">
+        <span class="info-text text-red" id="approxSlabText">Approximate slab thickness (L/30): -- cm</span>
+        <div class="form-group">
+            <label>Determined Slab Thickness [cm]:</label>
+            <input type="number" id="slabThickness" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <div class="section">
+        <span class="info-text text-red" id="approxBeamDepthText">Approximate beam depth (3 x slab thickness): -- cm</span>
+        <div class="form-group">
+            <label>Determined Beam Depth [cm]:</label>
+            <input type="number" id="beamDepth" oninput="calculateAll()">
+        </div>
+        
+        <span class="info-text text-red" id="suggestedBeamWidthText">Suggested beam width (Depth / 2): -- cm</span>
+        <div class="form-group">
+            <label>Determined Beam Width [cm]:</label>
+            <input type="number" id="beamWidth" oninput="calculateAll()">
+        </div>
+    </div>
+
+    <div class="section" id="resultsSection" style="display: none;">
+        <h3>Beam Properties</h3>
+        <div class="result-group">
+            <span class="result-label">Moment of Inertia (I<sub>x_beam</sub>):</span>
+            <span><span id="beamInertia">--</span> cm<sup>4</sup></span>
+        </div>
+        <div class="result-group">
+            <span class="result-label">Beam Area:</span>
+            <span><span id="beamArea">--</span> cm<sup>2</sup></span>
+        </div>
+
+        <h3 style="margin-top: 20px;">Column Properties (Square)</h3>
+        <div class="result-group">
+            <span class="result-label">Moment of Inertia (I<sub>column</sub>):</span>
+            <span><span id="columnInertia">--</span> cm<sup>4</sup></span>
+        </div>
+        <div class="result-group">
+            <span class="result-label">Column Side:</span>
+            <span><span id="columnSide">--</span> cm</span>
+        </div>
+        <div class="result-group">
+            <span class="result-label">Column Area:</span>
+            <span><span id="columnArea">--</span> cm<sup>2</sup></span>
+        </div>
+
+        <div class="visual-container">
+            <div class="visual-box">
+                <h4 style="margin-bottom: 10px;">Beam</h4>
+                <div id="beamVis" class="svg-container"></div>
+            </div>
+            <div class="visual-box">
+                <h4 style="margin-bottom: 10px;">Column</h4>
+                <div id="colVis" class="svg-container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function drawDimensions(containerId, w, h) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = ''; // Clear previous drawing
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svgSize = 220; // Fixed canvas size
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", svgSize);
+        svg.setAttribute("height", svgSize);
+
+        // Define arrowhead markers
+        const defs = document.createElementNS(svgNS, "defs");
+        defs.innerHTML = `
+            <marker id="arrow-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                <path d="M 10 0 L 0 5 L 10 10 z" fill="#c0392b" />
+            </marker>
+            <marker id="arrow-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b" />
+            </marker>
+        `;
+        svg.appendChild(defs);
+
+        // Scale geometry to leave room for dimension text
+        const padding = 60; 
+        const maxDim = Math.max(w, h);
+        const scale = (svgSize - padding * 1.5) / maxDim;
+        
+        const drawW = w * scale;
+        const drawH = h * scale;
+        
+        // Center the rectangle but shift left/up slightly to balance the right/bottom dimensions
+        const startX = (svgSize - drawW) / 2 - 20;
+        const startY = (svgSize - drawH) / 2 - 20;
+
+        // Draw Rect
+        const rect = document.createElementNS(svgNS, "rect");
+        rect.setAttribute("x", startX);
+        rect.setAttribute("y", startY);
+        rect.setAttribute("width", drawW);
+        rect.setAttribute("height", drawH);
+        rect.setAttribute("fill", "#bdc3c7");
+        rect.setAttribute("stroke", "#7f8c8d");
+        rect.setAttribute("stroke-width", "2");
+        svg.appendChild(rect);
+
+        // Draw Width Dimension (Bottom)
+        const dimY = startY + drawH + 25;
+        const lineW = document.createElementNS(svgNS, "line");
+        lineW.setAttribute("x1", startX);
+        lineW.setAttribute("y1", dimY);
+        lineW.setAttribute("x2", startX + drawW);
+        lineW.setAttribute("y2", dimY);
+        lineW.setAttribute("stroke", "#c0392b");
+        lineW.setAttribute("stroke-width", "1.5");
+        lineW.setAttribute("marker-start", "url(#arrow-start)");
+        lineW.setAttribute("marker-end", "url(#arrow-end)");
+        svg.appendChild(lineW);
+
+        const textW = document.createElementNS(svgNS, "text");
+        textW.setAttribute("x", startX + drawW / 2);
+        textW.setAttribute("y", dimY + 20);
+        textW.setAttribute("text-anchor", "middle");
+        textW.setAttribute("fill", "#c0392b");
+        textW.setAttribute("font-size", "14px");
+        textW.setAttribute("font-weight", "bold");
+        textW.textContent = w + " cm";
+        svg.appendChild(textW);
+
+        // Draw Height Dimension (Right)
+        const dimX = startX + drawW + 25;
+        const lineH = document.createElementNS(svgNS, "line");
+        lineH.setAttribute("x1", dimX);
+        lineH.setAttribute("y1", startY);
+        lineH.setAttribute("x2", dimX);
+        lineH.setAttribute("y2", startY + drawH);
+        lineH.setAttribute("stroke", "#c0392b");
+        lineH.setAttribute("stroke-width", "1.5");
+        lineH.setAttribute("marker-start", "url(#arrow-start)");
+        lineH.setAttribute("marker-end", "url(#arrow-end)");
+        svg.appendChild(lineH);
+
+        const textH = document.createElementNS(svgNS, "text");
+        textH.setAttribute("x", dimX + 15);
+        textH.setAttribute("y", startY + drawH / 2 + 5);
+        textH.setAttribute("fill", "#c0392b");
+        textH.setAttribute("font-size", "14px");
+        textH.setAttribute("font-weight", "bold");
+        textH.textContent = h + " cm";
+        svg.appendChild(textH);
+
+        container.appendChild(svg);
+    }
+
+    function calculateAll() {
+        const storyHeight = parseFloat(document.getElementById('storyHeight').value);
+        const spanLength = parseFloat(document.getElementById('spanLength').value);
+        const spanError = document.getElementById('spanError');
+        const proportionalWarning = document.getElementById('proportionalWarning');
+        const resultsSection = document.getElementById('resultsSection');
+        
+        // 1. Proportionality Warning
+        if (!isNaN(spanLength) && !isNaN(storyHeight) && spanLength > 0 && storyHeight > 0) {
+            if (spanLength < 1.5 * storyHeight) {
+                proportionalWarning.style.display = 'block';
+            } else {
+                proportionalWarning.style.display = 'none';
+            }
+        } else {
+            proportionalWarning.style.display = 'none';
+        }
+
+        // 2. Span Validation Constraint (920cm limit)
+        if (spanLength >= 920) {
+            spanError.innerText = "Error: Span lengths of 920 cm or greater are not supported.";
+            resultsSection.style.display = 'none';
+            return; 
+        } else {
+            spanError.innerText = "";
+        }
+
+        // 3. Slab approximation
+        if (!isNaN(spanLength) && spanLength > 0) {
+            const approxSlab = (spanLength / 30).toFixed(2);
+            document.getElementById('approxSlabText').innerText = `Approximate slab thickness (L/30): ${approxSlab} cm`;
+        } else {
+            document.getElementById('approxSlabText').innerText = `Approximate slab thickness (L/30): -- cm`;
+        }
+
+        // 4. Beam depth approximation
+        const slabThickness = parseFloat(document.getElementById('slabThickness').value);
+        if (!isNaN(slabThickness) && slabThickness > 0) {
+            const approxBeamDepth = (3 * slabThickness).toFixed(2);
+            document.getElementById('approxBeamDepthText').innerText = `Approximate beam depth (3 x slab thickness): ${approxBeamDepth} cm`;
+        } else {
+            document.getElementById('approxBeamDepthText').innerText = `Approximate beam depth (3 x slab thickness): -- cm`;
+        }
+
+        // 5. Beam width suggestion
+        const beamDepth = parseFloat(document.getElementById('beamDepth').value);
+        if (!isNaN(beamDepth) && beamDepth > 0) {
+            const suggestedBeamWidth = (beamDepth / 2).toFixed(2);
+            document.getElementById('suggestedBeamWidthText').innerText = `Suggested beam width (Depth / 2): ${suggestedBeamWidth} cm`;
+        } else {
+            document.getElementById('suggestedBeamWidthText').innerText = `Suggested beam width (Depth / 2): -- cm`;
+        }
+
+        // 6. Final Calculations & Visuals
+        const beamWidth = parseFloat(document.getElementById('beamWidth').value);
+
+        if (!isNaN(storyHeight) && !isNaN(spanLength) && !isNaN(beamDepth) && !isNaN(beamWidth)) {
+            resultsSection.style.display = 'block';
+
+            const Ix_beam = (beamWidth * Math.pow(beamDepth, 3)) / 12;
+            const areaBeam = beamWidth * beamDepth;
+            const I_column = 1.2 * Ix_beam * (storyHeight / spanLength);
+            
+            const exactSide = Math.sqrt(Math.sqrt(I_column * 12));
+            const sideColumn = Math.ceil(exactSide / 5) * 5; 
+            const areaColumn = Math.pow(sideColumn, 2);
+
+            document.getElementById('beamInertia').innerText = Ix_beam.toFixed(2);
+            document.getElementById('beamArea').innerText = areaBeam.toFixed(2);
+            document.getElementById('columnInertia').innerText = I_column.toFixed(2);
+            document.getElementById('columnSide').innerText = sideColumn;
+            
+            const areaColElement = document.getElementById('columnArea');
+            areaColElement.innerText = areaColumn;
+
+            if (areaColumn > areaBeam) {
+                areaColElement.className = "highlight-green";
+            } else {
+                areaColElement.className = "";
+            }
+
+            // Draw the SVG dimensions
+            drawDimensions('beamVis', beamWidth, beamDepth);
+            drawDimensions('colVis', sideColumn, sideColumn);
+            
+        } else {
+            resultsSection.style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>
