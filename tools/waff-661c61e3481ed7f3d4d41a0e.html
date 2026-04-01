@@ -231,6 +231,13 @@
                 <line x1="260" y1="205" x2="260" y2="235" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
             </svg>
         </div>
+
+        <div class="promo-box" style="margin-top: 30px; padding: 20px; background-color: #e8f4f8; border: 1px solid #bce8f1; border-radius: 8px; text-align: center;">
+            <h4 style="margin-top: 0; color: #31708f;">Visualize Your Design in 3D</h4>
+            <p style="color: #31708f; font-size: 0.95em; margin-bottom: 15px;">Want to see how these dimensions look in a real spatial environment? Use our Interactive 3D Structural Design Tool to visualize your waffle slab and columns.</p>
+            <a href="https://omerkaradag.tr/tools/vis-1106b1450afd0832ece8566b.html" style="display: inline-block; background-color: #3498db; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; transition: background-color 0.3s;">Launch 3D Visualizer</a>
+        </div>
+        
     </div>
 </div>
 
@@ -249,7 +256,7 @@
 // 1. Span Validation Check
         if (!isNaN(spanLength) && spanLength > 0) {
             if (spanLength <= 900) {
-                spanError.innerHTML = "Error: Span lengths of this scale are an overkill for waffle slabs. A standard slab with beams is recommended. You can use <a href='https://precious-fairy-bb5345.netlify.app/' target='_blank'>this calculator</a> instead.";
+                spanError.innerHTML = "Error: Span lengths of this scale are an overkill for waffle slabs. A standard slab with beams is recommended. You can use <a href='https://omerkaradag.tr/tools/calc-2302c4f0aad8bc347931ee6c.html' target='_blank'>this calculator</a> instead.";
                 spanError.style.display = 'block';
                 
                 // Hide subsequent sections if invalid
