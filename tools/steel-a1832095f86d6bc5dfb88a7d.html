@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preliminary Steel & Composite Design Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 850px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .disclaimer {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            font-weight: bold;
+            flex: 1;
+        }
+        input[type="number"], select {
+            width: 140px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .result-card {
+            background: #fff;
+            border: 2px solid #3498db;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .truss-card {
+            border-color: #8e44ad;
+            background-color: #f9f0ff;
+        }
+        .truss-title {
+            color: #8e44ad !important;
+        }
+        .result-title {
+            color: #3498db;
+            margin-top: 0;
+            font-size: 1.2em;
+            text-transform: uppercase;
+        }
+        .profile-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        .dxf-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #e67e22;
+            font-weight: bold;
+            text-decoration: none;
+            border: 1px solid #e67e22;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        .dxf-link:hover {
+            background-color: #e67e22;
+            color: #fff;
+        }
+        .svg-container {
+            margin: 20px auto;
+        }
+        .error-message {
+            color: #d32f2f;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 20px;
+        }
+        .truss-warning {
+            color: #6c3483;
+            font-size: 0.95em;
+            font-style: italic;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Preliminary Steel & Composite Design</h2>
+
+    <div class="disclaimer">
+        <strong>Disclaimer:</strong> This calculator provides preliminary sizing for standard steel and composite structures based on typical L/D deflection ratios and stiffness proportions. It does not replace rigorous structural analysis, connection design, or building code compliance.
+    </div>
+
+    <div class="section">
+        <div class="form-group">
+            <label>Shorter Span (Secondary direction) [m]:</label>
+            <input type="number" id="spanShort" step="0.1" oninput="calculateAll()">
+        </div>
+        <div class="form-group">
+            <label>Longer Span (Primary direction) [m]:</label>
+            <input type="number" id="spanLong" step="0.1" oninput="calculateAll()">
+        </div>
+        <div class="form-group">
+            <label>Story Height [m]:</label>
+            <input type="number" id="storyHeight" step="0.1" oninput="calculateAll()">
+        </div>
+        <div class="form-group">
+            <label>Preferred Column Section:</label>
+            <select id="colType" onchange="calculateAll()">
+                <option value="HEB">HEB (Wide Flange Steel)</option>
+                <option value="SHS">SHS (Square Hollow Steel)</option>
+                <option value="RC">RC (Reinforced Concrete Square)</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="errorMessage" class="error-message" style="display:none;"></div>
+
+    <div id="resultsSection" style="display: none;">
+        <div id="optWarning" style="display: none; background-color: #fff3cd; color: #856404; padding: 15px; border: 1px solid #ffeeba; border-radius: 5px; margin-bottom: 20px;"></div>
+
+        <div class="result-card truss-card" id="trussCard" style="display: none;">
+            <h3 class="result-title truss-title">Primary Span Alternative: Pratt Truss</h3>
+            
+            <div id="trussWarnings" style="margin-bottom: 15px;"></div>
+
+            <div class="profile-name" id="trussName">--</div>
+            <div id="trussVis" class="svg-container"></div>
+        </div>
+
+        <div class="result-card" id="primBeamCard">
+            <h3 class="result-title">Primary Beam (Girder)</h3>
+            <div class="profile-name" id="primName">--</div>
+            <div id="primVis" class="svg-container"></div>
+            <a href="#" id="primLink" class="dxf-link" target="_blank">Download DXF</a>
+        </div>
+
+        <div class="result-card">
+            <h3 class="result-title">Secondary Beam (Joist)</h3>
+            <div class="profile-name" id="secName">--</div>
+            <div id="secVis" class="svg-container"></div>
+            <a href="#" id="secLink" class="dxf-link" target="_blank">Download DXF</a>
+        </div>
+
+        <div class="result-card">
+            <h3 class="result-title">Column</h3>
+            <div class="profile-name" id="colName">--</div>
+            <div id="colVis" class="svg-container"></div>
+            <a href="#" id="colLink" class="dxf-link" target="_blank">Download DXF</a>
+        </div>
+
+        <div class="promo-box" style="margin-top: 40px; padding: 20px; background-color: #e8f4f8; border: 1px solid #bce8f1; border-radius: 8px; text-align: center;">
+            <h4 style="margin-top: 0; color: #31708f; font-size: 1.2em;">Visualize Your Frame in 3D</h4>
+            <p style="color: #31708f; font-size: 0.95em; margin-bottom: 15px;">Want to see how these standard sections fit together? Use our interactive 3D visualizer to explore the structural steel layout.</p>
+            <a href="#" style="display: inline-block; background-color: #3498db; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; transition: background-color 0.3s;">Launch 3D Visualizer</a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ==========================================
+    // 1. DATA ENTRY SECTION (PASTE YOUR JSON HERE)
+    // ==========================================
+    const rawIPE = [{"Profile":["IPE80","IPE100","IPE120","IPE140","IPE160","IPE180","IPE200","IPE220","IPE240","IPE270","IPE300","IPE330","IPE360","IPE400","IPE450","IPE500","IPE550","IPE600"]},{"Drawing":["https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE80","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE80","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE80","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE270","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE300","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE270","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/IPE450"]},{"h":["80","100","120","140","160","180","200","220","240","270","300","330","360","400","450","500","550","600"]},{"b":["46","55","64","73","82","91","100","110","120","135","150","160","170","180","190","200","210","220"]},{"Ix":["0.8014","1.71","3.178","5.412","8.693","13.17","19.43","27.72","38.92","57.9","83.56","117.7","162.7","231.3","337.4","482","671.2","920.8"]},{"Iy":["0.08489","0.1592","0.2767","0.4492","0.6831","1.009","1.424","2.049","2.836","4.199","6.038","7.881","10.43","13.18","16.76","21.42","26.68","33.87"]}];
+    const rawHEB = [{"Profile":["HEB100","HEB120","HEB140","HEB160","HEB180","HEB200","HEB220","HEB240","HEB260","HEB280","HEB300","HEB320","HEB340","HEB360","HEB400","HEB450","HEB500","HEB550","HEB600","HEB650","HEB700","HEB800","HEB900","HEB1000"]},{"Drawing":["https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB800","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEB800"]},{"h":["100","120","140","160","180","200","220","240","260","280","300","320","340","360","400","450","500","550","600","650","700","800","900","1000"]},{"b":["100","120","140","160","180","200","220","240","260","280","300","300","300","300","300","300","300","300","300","300","300","300","300","300"]},{"Ix":["4.495","8.644","15.09","24.92","38.31","56.96","80.91","112.6","149.2","192.7","251.7","308.2","366.6","431.9","576.8","798.9","1072","1367","1710","2106","2569","3591","4941","6447"]},{"Iy":["1.673","3.175","5.497","8.892","13.63","20.03","28.43","39.23","51.35","65.95","85.63","92.39","96.9","101.4","108.2","117.2","126.2","130.8","135.3","139.8","144.4","149","158.2","162.8"]}];
+    const rawHEA = [{"Profile":["HEA100","HEA120","HEA140","HEA160","HEA180","HEA200","HEA220","HEA240","HEA260","HEA280","HEA300","HEA320","HEA340","HEA360","HEA400","HEA450","HEA500","HEA550","HEA600","HEA650","HEA700","HEA800","HEA900","HEA1000"]},{"Drawing":["https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA100","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA120","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA400","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA800","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA450","https://eurocodeapplied.com/download/en1993/flanged-profile-dxf/HEA800"]},{"h":["96","114","133","152","171","190","210","230","250","270","290","310","330","350","390","440","490","540","590","640","690","790","890","990"]},{"b":["100","120","140","160","180","200","220","240","260","280","300","300","300","300","300","300","300","300","300","300","300","300","300","300"]},{"Ix":["3.492","6.062","10.33","16.73","25.1","36.92","54.1","77.63","104.5","136.7","182.6","229.3","276.9","330.9","450.7","637.2","869.7","1119","1412","1752","2153","3034","4221","5538"]},{"Iy":["1.338","2.309","3.893","6.156","9.246","13.36","19.55","27.69","36.68","47.63","63.1","69.85","74.36","78.87","85.64","94.65","103.7","108.2","112.7","117.2","121.8","126.4","135.5","140"]}];
+    const rawSHS = [{"Profile":["SHS 40 / 2.6","SHS 40 / 3.2","SHS 40 / 4","SHS 40 / 5","SHS 50 / 2.6","SHS 50 / 3.2","SHS 50 / 4","SHS 50 / 5","SHS 50 / 6.3","SHS 60 / 2.6","SHS 60 / 3.2","SHS 60 / 4","SHS 60 / 5","SHS 60 / 6.3","SHS 60 / 8","SHS 70 / 3.2","SHS 70 / 4","SHS 70 / 5","SHS 70 / 6.3","SHS 70 / 8","SHS 80 / 3.2","SHS 80 / 4","SHS 80 / 5","SHS 80 / 6.3","SHS 80 / 8","SHS 90 / 4","SHS 90 / 5","SHS 90 / 6.3","SHS 90 / 8","SHS 100 / 4","SHS 100 / 5","SHS 100 / 6.3","SHS 100 / 8","SHS 100 / 10","SHS 120 / 5","SHS 120 / 6.3","SHS 120 / 8","SHS 120 / 10","SHS 120 / 12.5","SHS 140 / 5","SHS 140 / 6.3","SHS 140 / 8","SHS 140 / 10","SHS 140 / 12.5","SHS 150 / 5","SHS 150 / 6.3","SHS 150 / 8","SHS 150 / 10","SHS 150 / 12.5","SHS 150 / 14.2","SHS 150 / 16","SHS 160 / 5","SHS 160 / 6.3","SHS 160 / 8","SHS 160 / 10","SHS 160 / 12.5","SHS 160 / 14.2","SHS 160 / 16","SHS 180 / 5","SHS 180 / 6.3","SHS 180 / 8","SHS 180 / 10","SHS 180 / 12.5","SHS 180 / 14.2","SHS 180 / 16","SHS 200 / 5","SHS 200 / 6.3","SHS 200 / 8","SHS 200 / 10","SHS 200 / 12.5","SHS 200 / 14.2","SHS 200 / 16","SHS 220 / 6.3","SHS 220 / 8","SHS 220 / 10","SHS 220 / 12.5","SHS 220 / 14.2","SHS 220 / 16","SHS 250 / 6.3","SHS 250 / 8","SHS 250 / 10","SHS 250 / 12.5","SHS 250 / 14.2","SHS 250 / 16","SHS 260 / 6.3","SHS 260 / 8","SHS 260 / 10","SHS 260 / 12.5","SHS 260 / 14.2","SHS 260 / 16","SHS 300 / 6.3","SHS 300 / 8","SHS 300 / 10","SHS 300 / 12.5","SHS 300 / 14.2","SHS 300 / 16","SHS 350 / 8","SHS 350 / 10","SHS 350 / 12.5","SHS 350 / 14.2","SHS 350 / 16","SHS 400 / 10","SHS 400 / 12.5","SHS 400 / 14.2","SHS 400 / 16","SHS 400 / 20"]},{"Drawing":["https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS40__2_6","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS40__3_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS40__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS40__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS50__2_6","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS50__3_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS50__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS50__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS50__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__2_6","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__3_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS60__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS70__3_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS70__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS70__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS70__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS70__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS80__3_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS80__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS80__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS80__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS80__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS90__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS90__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS90__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS90__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS100__4","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS100__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS100__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS100__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS100__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS120__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS120__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS120__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS120__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS120__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS140__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS140__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS140__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS140__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS140__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS150__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS160__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS180__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS200__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS220__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS250__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS260__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__6_3","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS300__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS350__8","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS350__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS350__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS350__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS350__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS400__10","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS400__12_5","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS400__14_2","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS400__16","https://eurocodeapplied.com/download/en1993/hot-finished-square-hollow-section-dxf/SHS400__20"]},{"b":["40","40","40","40","50","50","50","50","50","60","60","60","60","60","60","70","70","70","70","70","80","80","80","80","80","90","90","90","90","100","100","100","100","100","120","120","120","120","120","140","140","140","140","140","150","150","150","150","150","150","150","160","160","160","160","160","160","160","180","180","180","180","180","180","180","200","200","200","200","200","200","200","220","220","220","220","220","220","250","250","250","250","250","250","260","260","260","260","260","260","300","300","300","300","300","300","350","350","350","350","350","400","400","400","400","400"]},{"h":["40","40","40","40","50","50","50","50","50","60","60","60","60","60","60","70","70","70","70","70","80","80","80","80","80","90","90","90","90","100","100","100","100","100","120","120","120","120","120","140","140","140","140","140","150","150","150","150","150","150","150","160","160","160","160","160","160","160","180","180","180","180","180","180","180","200","200","200","200","200","200","200","220","220","220","220","220","220","250","250","250","250","250","250","260","260","260","260","260","260","300","300","300","300","300","300","350","350","350","350","350","400","400","400","400","400"]},{"Ix":["0.08797","0.1023","0.1183","0.1337","0.1803","0.2123","0.2497","0.2888","0.3276","0.3216","0.3816","0.4539","0.5326","0.6165","0.6973","0.6231","0.7469","0.885","1.038","1.198","0.9495","1.145","1.366","1.619","1.893","1.663","1.996","2.383","2.815","2.318","2.794","3.356","3.996","4.621","4.977","6.029","7.263","8.521","9.818","8.075","9.839","11.95","14.16","16.53","10.02","12.23","14.91","17.73","20.8","22.62","24.3","12.25","14.99","18.31","21.86","25.76","28.09","30.28","17.65","21.68","26.61","31.93","37.9","41.54","45.04","24.45","30.11","37.09","44.71","53.36","58.72","63.94","40.49","50.02","60.5","72.54","80.07","87.49","60.14","74.55","90.55","109.2","120.9","132.7","67.88","84.23","102.4","123.6","137.1","150.6","105.5","131.3","160.3","194.4","216.4","238.5","211.3","258.8","315.4","352.1","389.4","391.3","478.4","535.3","593.4","715.3"]},{"Iy":["0.08797","0.1023","0.1183","0.1337","0.1803","0.2123","0.2497","0.2888","0.3276","0.3216","0.3816","0.4539","0.5326","0.6165","0.6973","0.6231","0.7469","0.885","1.038","1.198","0.9495","1.145","1.366","1.619","1.893","1.663","1.996","2.383","2.815","2.318","2.794","3.356","3.996","4.621","4.977","6.029","7.263","8.521","9.818","8.075","9.839","11.95","14.16","16.53","10.02","12.23","14.91","17.73","20.8","22.62","24.3","12.25","14.99","18.31","21.86","25.76","28.09","30.28","17.65","21.68","26.61","31.93","37.9","41.54","45.04","24.45","30.11","37.09","44.71","53.36","58.72","63.94","40.49","50.02","60.5","72.54","80.07","87.49","60.14","74.55","90.55","109.2","120.9","132.7","67.88","84.23","102.4","123.6","137.1","150.6","105.5","131.3","160.3","194.4","216.4","238.5","211.3","258.8","315.4","352.1","389.4","391.3","478.4","535.3","593.4","715.3"]}];
+
+    // ==========================================
+    // 2. DATA PARSER
+    // ==========================================
+    function parseColumnData(rawObj) {
+        let parsedList = [];
+        const arrays = rawObj.map(col => Object.values(col)[0]); 
+        const length = arrays[0].length;
+        
+        for (let i = 0; i < length; i++) {
+            parsedList.push({
+                profile: arrays[0][i],
+                link: arrays[1][i],
+                h: parseFloat(arrays[2][i]),
+                b: parseFloat(arrays[3][i]),
+                Ix: parseFloat(arrays[4][i]),
+                Iy: parseFloat(arrays[5][i])
+            });
+        }
+        return parsedList;
+    }
+
+    const ipeData = parseColumnData(rawIPE);
+    const heaData = parseColumnData(rawHEA);
+    const hebData = parseColumnData(rawHEB);
+    const shsData = parseColumnData(rawSHS);
+
+    // ==========================================
+    // 3. SVG DRAWING FUNCTIONS
+    // ==========================================
+    function drawProfile(containerId, sectionType, h, b) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = ''; 
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svgSize = 220; 
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", svgSize);
+        svg.setAttribute("height", svgSize);
+
+        const padding = 60; 
+        const maxDim = Math.max(w = b, h);
+        const scale = (svgSize - padding) / maxDim;
+        
+        const drawW = b * scale;
+        const drawH = h * scale;
+        
+        const startX = (svgSize - drawW) / 2 - 15;
+        const startY = (svgSize - drawH) / 2 - 15;
+
+        const shapeGroup = document.createElementNS(svgNS, "g");
+        shapeGroup.setAttribute("fill", "#bdc3c7");
+        shapeGroup.setAttribute("stroke", "#7f8c8d");
+        shapeGroup.setAttribute("stroke-width", "2");
+
+        const t = Math.max(Math.min(drawW, drawH) * 0.1, 4); 
+
+        if (sectionType === "SHS") {
+            const outer = document.createElementNS(svgNS, "rect");
+            outer.setAttribute("x", startX); outer.setAttribute("y", startY);
+            outer.setAttribute("width", drawW); outer.setAttribute("height", drawH);
+            const inner = document.createElementNS(svgNS, "rect");
+            inner.setAttribute("x", startX + t); inner.setAttribute("y", startY + t);
+            inner.setAttribute("width", drawW - 2*t); inner.setAttribute("height", drawH - 2*t);
+            inner.setAttribute("fill", "#fff"); 
+            shapeGroup.appendChild(outer);
+            shapeGroup.appendChild(inner);
+        } else if (sectionType === "RC") {
+            const rcBox = document.createElementNS(svgNS, "rect");
+            rcBox.setAttribute("x", startX); rcBox.setAttribute("y", startY);
+            rcBox.setAttribute("width", drawW); rcBox.setAttribute("height", drawH);
+            rcBox.setAttribute("fill", "#dcdde1"); // Concrete color
+            // Add some rebars for visual flair
+            const rebarPadding = 8;
+            [[startX+rebarPadding, startY+rebarPadding], [startX+drawW-rebarPadding, startY+rebarPadding], 
+             [startX+rebarPadding, startY+drawH-rebarPadding], [startX+drawW-rebarPadding, startY+drawH-rebarPadding]].forEach(pos => {
+                const dot = document.createElementNS(svgNS, "circle");
+                dot.setAttribute("cx", pos[0]); dot.setAttribute("cy", pos[1]);
+                dot.setAttribute("r", 3); dot.setAttribute("fill", "#2f3640");
+                shapeGroup.appendChild(dot);
+            });
+            shapeGroup.insertBefore(rcBox, shapeGroup.firstChild);
+        } else {
+            // I-Beam
+            const topFlange = document.createElementNS(svgNS, "rect");
+            topFlange.setAttribute("x", startX); topFlange.setAttribute("y", startY);
+            topFlange.setAttribute("width", drawW); topFlange.setAttribute("height", t);
+            const bottomFlange = document.createElementNS(svgNS, "rect");
+            bottomFlange.setAttribute("x", startX); bottomFlange.setAttribute("y", startY + drawH - t);
+            bottomFlange.setAttribute("width", drawW); bottomFlange.setAttribute("height", t);
+            const web = document.createElementNS(svgNS, "rect");
+            web.setAttribute("x", startX + (drawW/2) - (t/2)); web.setAttribute("y", startY + t);
+            web.setAttribute("width", t); web.setAttribute("height", drawH - 2*t);
+            shapeGroup.appendChild(topFlange);
+            shapeGroup.appendChild(bottomFlange);
+            shapeGroup.appendChild(web);
+        }
+        svg.appendChild(shapeGroup);
+
+        // Dimensions Text (simplified for brevity)
+        const textW = document.createElementNS(svgNS, "text");
+        textW.setAttribute("x", startX + drawW / 2); textW.setAttribute("y", startY + drawH + 20);
+        textW.setAttribute("text-anchor", "middle"); textW.setAttribute("fill", "#c0392b");
+        textW.setAttribute("font-weight", "bold"); textW.textContent = sectionType === "RC" ? (b/10) + " cm" : b + " mm";
+        svg.appendChild(textW);
+
+        const textH = document.createElementNS(svgNS, "text");
+        textH.setAttribute("x", startX + drawW + 10); textH.setAttribute("y", startY + drawH / 2 + 5);
+        textH.setAttribute("fill", "#c0392b"); textH.setAttribute("font-weight", "bold");
+        textH.textContent = sectionType === "RC" ? (h/10) + " cm" : h + " mm";
+        svg.appendChild(textH);
+
+        container.appendChild(svg);
+    }
+
+    function drawTruss(containerId, L_m, D_m) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = ''; 
+
+        const svgNS = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(svgNS, "svg");
+        svg.setAttribute("width", "100%");
+        svg.setAttribute("height", "150");
+        svg.setAttribute("viewBox", "0 0 800 150");
+
+        // Pratt Truss Math (45 degree diagonals = panel width matches depth)
+        const numPanels = Math.max(4, Math.round(L_m / D_m)); 
+        const drawW = 750;
+        const panelW = drawW / numPanels;
+        const drawH = 100;
+        const startX = 25;
+        const startY = 25;
+
+        const g = document.createElementNS(svgNS, "g");
+        g.setAttribute("stroke", "#8e44ad");
+        g.setAttribute("stroke-width", "4");
+        g.setAttribute("stroke-linecap", "round");
+
+        // Chords
+        const topChord = document.createElementNS(svgNS, "line");
+        topChord.setAttribute("x1", startX); topChord.setAttribute("y1", startY);
+        topChord.setAttribute("x2", startX + drawW); topChord.setAttribute("y2", startY);
+        const botChord = document.createElementNS(svgNS, "line");
+        botChord.setAttribute("x1", startX); botChord.setAttribute("y1", startY + drawH);
+        botChord.setAttribute("x2", startX + drawW); botChord.setAttribute("y2", startY + drawH);
+        g.appendChild(topChord); g.appendChild(botChord);
+
+        // Web Members
+        for(let i=0; i<=numPanels; i++) {
+            const px = startX + i*panelW;
+            // Verticals
+            const vert = document.createElementNS(svgNS, "line");
+            vert.setAttribute("x1", px); vert.setAttribute("y1", startY);
+            vert.setAttribute("x2", px); vert.setAttribute("y2", startY + drawH);
+            g.appendChild(vert);
+
+            // Pratt Diagonals (down towards center)
+            if (i < numPanels / 2 && i < numPanels) {
+                const diag = document.createElementNS(svgNS, "line");
+                diag.setAttribute("x1", px); diag.setAttribute("y1", startY);
+                diag.setAttribute("x2", px + panelW); diag.setAttribute("y2", startY + drawH);
+                g.appendChild(diag);
+            } else if (i > numPanels / 2 && i <= numPanels) {
+                const diag = document.createElementNS(svgNS, "line");
+                diag.setAttribute("x1", px); diag.setAttribute("y1", startY);
+                diag.setAttribute("x2", px - panelW); diag.setAttribute("y2", startY + drawH);
+                g.appendChild(diag);
+            }
+        }
+        svg.appendChild(g);
+        container.appendChild(svg);
+    }
+
+    // ==========================================
+    // 4. MAIN CALCULATION LOGIC
+    // ==========================================
+    function calculateAll() {
+        const spanShort = parseFloat(document.getElementById('spanShort').value);
+        const spanLong = parseFloat(document.getElementById('spanLong').value);
+        const storyHeight = parseFloat(document.getElementById('storyHeight').value);
+        const colType = document.getElementById('colType').value;
+        
+        const resultsSection = document.getElementById('resultsSection');
+        const errorMessage = document.getElementById('errorMessage');
+        const trussCard = document.getElementById('trussCard');
+        const primBeamCard = document.getElementById('primBeamCard');
+
+        if (isNaN(spanShort) || isNaN(spanLong) || isNaN(storyHeight) || spanShort <= 0 || spanLong <= 0 || storyHeight <= 0) {
+            resultsSection.style.display = 'none';
+            errorMessage.style.display = 'none';
+            return;
+        }
+
+        if (spanShort > spanLong) {
+            errorMessage.innerText = "Error: Shorter span cannot be larger than the longer span.";
+            errorMessage.style.display = 'block';
+            resultsSection.style.display = 'none';
+            return;
+        } else {
+            errorMessage.style.display = 'none';
+        }
+
+        const L_sec_mm = spanShort * 1000;
+        const L_prim_mm = spanLong * 1000;
+
+        // 1. Secondary Beam (IPE at L/20)
+        const target_h_sec = L_sec_mm / 20;
+        const selectedSec = ipeData.find(p => p.h >= target_h_sec);
+
+        if (!selectedSec) {
+            errorMessage.innerText = "Error: Secondary span is too large for the standard IPE catalog.";
+            errorMessage.style.display = 'block';
+            resultsSection.style.display = 'none';
+            return;
+        }
+
+        // 2. Truss Check & Primary Beam Logic
+// 2. Truss Check & Primary Beam Logic
+        let primary_Ix_for_col = 0; 
+        const trussWarnings = document.getElementById('trussWarnings');
+        trussWarnings.innerHTML = ""; // Clear previous warnings
+
+        // Absolute Maximum Span Cut-off (megastructures)
+        if (spanLong > 30) {
+            errorMessage.innerHTML = `<div style="background-color: #f8d7da; color: #721c24; padding: 15px; border: 1px solid #f5c6cb; border-radius: 5px; text-align: left;"><strong>Span Limit Exceeded:</strong> A span of ${spanLong}m is beyond standard flat architectural trusses. Spans of this magnitude require advanced megastructure systems like space frames, arches, or cable-stayed structures.</div>`;
+            errorMessage.style.display = 'block';
+            resultsSection.style.display = 'none';
+            return; 
+
+        } else if (spanLong > 13) {
+            trussCard.style.display = 'block';
+            primBeamCard.style.display = 'none';
+            
+            const rawDepth = spanLong / 12;
+            const trussDepth = (Math.round(rawDepth * 10) / 10).toFixed(1);
+            document.getElementById('trussName').innerText = `Pratt Truss - Length: ${spanLong}m, Depth: ${trussDepth}m`;
+            drawTruss('trussVis', spanLong, trussDepth);
+            
+            primary_Ix_for_col = 50000; 
+
+            // --- TEACHING NOTES & WARNINGS ---
+            let warningsHTML = "";
+
+            // 1. Serviceability / Vibration Note (Always applies to trusses)
+            warningsHTML += `<div style="color: #d35400; background-color: #fdebd0; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; text-align: left; border-left: 4px solid #8e44ad;"><strong>Serviceability Note (Floors vs. Roofs):</strong> For such a long span, trusses are structurally efficient thanks to the absence of massive bending moments, relying instead on pure axial compression and tension. However, because steel lacks mass and damping, floor trusses are highly sensitive to vibrations. If this is a loaded floor, <strong>Prestressed or Post-Tensioned Concrete</strong> is typically a superior choice.</div>`;
+
+            // 2. 20m+ Fabrication Warning
+            if (spanLong > 20) {
+                warningsHTML += `<div style="color: #d35400; background-color: #fdebd0; padding: 10px; border-radius: 5px; margin-bottom: 10px; font-size: 0.9em; text-align: left; border-left: 4px solid #e67e22;"><strong>Fabrication Warning:</strong> Trusses spanning over 20m must be carefully designed and detailed. Transportation limits usually require them to be spliced on-site, and they require calculated camber (pre-bending) to counteract severe dead-load deflections.</div>`;
+            }
+
+            trussWarnings.innerHTML = warningsHTML;
+
+            // 3. Optimization Error (Secondary span > 8m)
+            if (spanShort > 8) {
+                errorMessage.innerHTML = `<div style="background-color: #f8d7da; color: #721c24; padding: 15px; border: 1px solid #f5c6cb; border-radius: 5px; font-weight: normal; text-align: left;"><strong>Optimization Error:</strong> A secondary span of ${spanShort}m requires very heavy purlins (like the ${selectedSec.profile}). Consider spacing your primary trusses closer together (e.g., 5m - 8m) to significantly reduce the weight and cost of the secondary framing.</div>`;
+                errorMessage.style.display = 'block';
+                resultsSection.style.display = 'none';
+                return; 
+            }
+
+        } else {
+            trussCard.style.display = 'none';
+            primBeamCard.style.display = 'block';
+
+            const target_h_prim = L_prim_mm / 18;
+            const selectedPrim = heaData.find(p => p.h >= target_h_prim);
+            if (!selectedPrim) {
+                errorMessage.innerText = "Error: Primary span is too large for standard HEA catalog.";
+                errorMessage.style.display = 'block';
+                resultsSection.style.display = 'none';
+                return;
+            }
+            primary_Ix_for_col = selectedPrim.Ix;
+            document.getElementById('primName').innerText = selectedPrim.profile;
+            document.getElementById('primLink').href = selectedPrim.link;
+            drawProfile('primVis', 'I', selectedPrim.h, selectedPrim.b);
+        }
+                
+        // 3. Column Sizing
+        const min_I_col_y = selectedSec.Ix * 1.2 * (storyHeight / spanShort);
+        let selectedCol = null;
+
+        if (colType === "RC") {
+            // Composite Logic: E_s / E_c ≈ 6.67
+            const modRatio = 6.67;
+            const min_I_col_x = primary_Ix_for_col * 1.2 * (storyHeight / spanLong) * modRatio;
+            const rc_min_I_y = min_I_col_y * modRatio;
+            const maxReqI = Math.max(min_I_col_x, rc_min_I_y);
+            
+            // I = c^4 / 12 -> c = (12 * I * 10^6)^(0.25)
+            const I_mm4 = maxReqI * 1000000;
+            const exactSide_mm = Math.pow(12 * I_mm4, 0.25);
+            const side_cm = Math.ceil((exactSide_mm / 10) / 5) * 5; // Round up to 5cm intervals
+            
+            selectedCol = {
+                profile: `RC Column ${side_cm} x ${side_cm} cm`,
+                link: "#",
+                h: side_cm * 10,
+                b: side_cm * 10,
+                Ix: maxReqI,
+                Iy: maxReqI
+            };
+            document.getElementById('colLink').style.display = 'none';
+        } else {
+            // Standard Steel Column Logic
+            const min_I_col_x = primary_Ix_for_col * 1.2 * (storyHeight / spanLong);
+            const columnCatalog = colType === "HEB" ? hebData : shsData;
+            selectedCol = columnCatalog.find(p => p.Ix >= min_I_col_x && p.Iy >= min_I_col_y);
+
+            if (!selectedCol) {
+                // Built-up plate logic fallback
+                const maxReqI = Math.max(min_I_col_x, min_I_col_y); 
+                if (colType === "SHS") {
+                    const I_mm4 = maxReqI * 1000000;
+                    const exactSide = Math.cbrt((I_mm4 * 3) / (2 * 20)); 
+                    const sideColumn = Math.ceil(exactSide / 10) * 10; 
+                    selectedCol = { profile: `Custom Welded Box ${sideColumn}x${sideColumn}x20 mm`, link: "#", h: sideColumn, b: sideColumn };
+                } else if (colType === "HEB") {
+                    const I_y_mm4 = min_I_col_y * 1000000;
+                    const exactWidth = Math.cbrt((I_y_mm4 * 12) / (2 * 25)); 
+                    const colWidth = Math.ceil(exactWidth / 10) * 10;
+                    const I_x_mm4 = min_I_col_x * 1000000;
+                    const exactHeight = Math.sqrt(I_x_mm4 / (colWidth * 25)) * 2;
+                    const colHeight = Math.ceil(Math.max(exactHeight, colWidth) / 10) * 10; 
+                    selectedCol = { profile: `Custom Welded H-Section ${colHeight}x${colWidth} mm`, link: "#", h: colHeight, b: colWidth };
+                }
+                document.getElementById('colLink').style.display = 'none';
+            } else {
+                document.getElementById('colLink').style.display = 'inline-block';
+            }
+        }
+
+        // Final Output
+        resultsSection.style.display = 'block';
+        document.getElementById('secName').innerText = selectedSec.profile;
+        document.getElementById('secLink').href = selectedSec.link;
+        drawProfile('secVis', 'I', selectedSec.h, selectedSec.b);
+
+        document.getElementById('colName').innerText = selectedCol.profile;
+        if(selectedCol.link !== "#") document.getElementById('colLink').href = selectedCol.link;
+        drawProfile('colVis', colType, selectedCol.h, selectedCol.b);
+    }
+</script>
+
+</body>
+</html>
