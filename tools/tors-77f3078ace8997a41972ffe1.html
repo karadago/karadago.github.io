@@ -1,1 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torsion</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-left: 5px solid #ffeeba;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .upload-section {
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            display: block;
+            margin-top: 10px;
+        }
+        canvas {
+            max-width: 100%;
+            border: 1px solid #ccc;
+            margin-top: 20px;
+            background-color: white;
+            border-radius: 4px;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            font-size: 1.1em;
+        }
+        .cm-text { color: #d9534f; font-weight: bold; }
+        .cs-text { color: #0275d8; font-weight: bold; }
+    </style>
+</head>
+<body>
 
+<div class="container">
+    <h2>Center of Mass & Stiffness Calculator</h2>
+    
+    <div class="warning-box">
+        <strong>IMPORTANT:</strong> Please upload an image containing <strong>ONLY the plan boundaries and structural members (columns/shear walls)</strong>. <br><br>
+        You MUST remove any non-structural elements (doors, windows, furniture, dimensions, text) before uploading. For the best accuracy, use an image with dark structural members on a white background.
+    </div>
+
+    <div class="upload-section">
+        <label for="imageUpload"><strong>Upload Floor Plan Image (PNG/JPG):</strong></label>
+        <input type="file" id="imageUpload" accept="image/png, image/jpeg, image/jpg">
+    </div>
+
+    <div id="results" class="results" style="display: none;"></div>
+    
+    <canvas id="canvas"></canvas>
+</div>
+
+<script>
+    const fileInput = document.getElementById('imageUpload');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const resultsDiv = document.getElementById('results');
+
+    fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const img = new Image();
+        img.onload = function() {
+            // Set canvas size to match image
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            // Draw original image
+            ctx.drawImage(img, 0, 0);
+            
+            // Run analysis
+            analyzeStructure(img.width, img.height);
+        }
+        img.src = URL.createObjectURL(file);
+    });
+
+    function analyzeStructure(width, height) {
+        // Get pixel data from canvas
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        let minX = width, maxX = 0, minY = height, maxY = 0;
+        let sumX = 0, sumY = 0, structuralPixelCount = 0;
+
+        // Loop through every pixel
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = (y * width + x) * 4;
+                const r = data[index];
+                const g = data[index+1];
+                const b = data[index+2];
+                const alpha = data[index+3];
+
+                // Calculate brightness (0 is black, 255 is white)
+                const brightness = (r + g + b) / 3;
+
+                // If pixel is sufficiently dark and not transparent, it's a structural element
+                if (brightness < 250 && alpha > 50) {
+                    
+                    // 1. Track boundaries for Center of Mass
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+
+                    // 2. Accumulate weight for Center of Stiffness
+                    sumX += x;
+                    sumY += y;
+                    structuralPixelCount++;
+                }
+            }
+        }
+
+        if (structuralPixelCount === 0) {
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = "❌ No structural members detected. Please ensure the image has dark shapes on a light background.";
+            return;
+        }
+
+        // --- CALCULATIONS ---
+        
+        // Center of Mass (Geometric center of the bounding box)
+        const cmX = minX + (maxX - minX) / 2;
+        const cmY = minY + (maxY - minY) / 2;
+
+        // Center of Stiffness (Area-weighted centroid of all structural pixels)
+        const csX = sumX / structuralPixelCount;
+        const csY = sumY / structuralPixelCount;
+
+        // --- DRAWING RESULTS ---
+
+        // Draw Bounding Box (Plan Boundaries)
+        ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+        ctx.setLineDash([]); // Reset line dash
+
+        // Draw CM & CS Points
+        drawPoint(cmX, cmY, '#d9534f', 'CM');
+        drawPoint(csX, csY, '#0275d8', 'CS');
+
+        // Update UI Text
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = `
+            <span class="cm-text">● Center of Mass (CM):</span> (${Math.round(cmX)}px, ${Math.round(cmY)}px)<br>
+            <span class="cs-text">● Center of Stiffness (CS):</span> (${Math.round(csX)}px, ${Math.round(csY)}px)<br>
+            <br>
+            <small><em>Green dashed line represents detected plan boundaries.</em></small>
+        `;
+    }
+
+    function drawPoint(x, y, color, label) {
+        ctx.beginPath();
+        
+        // 1. INCREASE THE DOT SIZE: Changed radius from 6 to 12
+        ctx.arc(x, y, 12, 0, 2 * Math.PI, false); 
+        
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'white';
+        ctx.stroke();
+
+        // 2. INCREASE THE TEXT SIZE: Changed from '16px' to '24px'
+        ctx.font = 'bold 24px Arial'; 
+        
+        ctx.fillStyle = color;
+        // Add a slight white shadow to text for readability
+        ctx.shadowColor = "white";
+        ctx.shadowBlur = 4;
+        
+        // 3. PUSH TEXT FURTHER AWAY: Changed offsets to x+15 and y-15 so it doesn't overlap the bigger dot
+        ctx.fillText(label, x + 15, y - 15); 
+        
+        ctx.shadowBlur = 0; // reset
+    }
+</script>
+
+</body>
+</html> 
