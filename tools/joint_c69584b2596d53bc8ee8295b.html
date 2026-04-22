@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Joint Gap Calculator</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+            color: #000;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border: 2px solid #000;
+        }
+        .note-box {
+            background-color: #fff;
+            color: #000;
+            padding: 15px;
+            border: 2px solid #000;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .input-section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px dashed #000;
+            background-color: #fafafa;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+            display: inline-block;
+            width: 250px;
+        }
+        input[type="number"] {
+            font-family: 'Courier New', Courier, monospace;
+            padding: 8px;
+            font-size: 1em;
+            border: 1px solid #000;
+            width: 120px;
+            background-color: #fff;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 20px;
+            border: 2px solid #000;
+            font-size: 1.2em;
+            background-color: #e8e8e8;
+        }
+        .result-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #d9534f;
+            display: block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>[TBEC-2018 JOINT GAP CALCULATOR]</h2>
+    
+    <div class="note-box">
+        <strong>CODE REQUIREMENT:</strong><br><br>
+        According to the Turkish Building Earthquake Code (TBEC-2018), joint gaps are required (or advised) for adjacent buildings, structures with distinct height or foundation level differences, buildings with plan lengths exceeding 40m, or those featuring severe plan irregularities such as re-entrant corners (e.g., L-, T-, or U-shaped layouts). 
+    </div>
+
+    <div class="input-section">
+        <div class="input-group">
+            <label for="heightInput">BUILDING HEIGHT (m):</label>
+            <input type="number" id="heightInput" value="15" step="0.1" min="0" oninput="calculateGap()">
+        </div>
+    </div>
+
+    <div id="results" class="results">
+        <strong>MINIMUM REQUIRED JOINT GAP:</strong>
+        <span class="result-value" id="gapOutput">60 mm</span>
+    </div>
+</div>
+
+<script>
+    function calculateGap() {
+        const heightInput = document.getElementById('heightInput').value;
+        const h = parseFloat(heightInput);
+        const output = document.getElementById('gapOutput');
+        
+        if (isNaN(h) || h < 0) {
+            output.innerText = "INVALID INPUT";
+            output.style.color = "#000";
+            return;
+        }
+
+        let gap = 30; // Base gap for up to 6m
+        
+        if (h > 6) {
+            // Add 10mm for every 3m increase above 6m
+            gap = 30 + Math.round((h - 6) / 3) * 10;
+        }
+        
+        output.innerText = Math.round(gap) + " mm";
+        output.style.color = "#d9534f"; // Keep the red accent color
+    }
+
+    // Run calculation immediately on page load
+    window.onload = calculateGap;
+</script>
+
+</body>
+</html>
