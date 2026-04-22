@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Designing Timber Structures</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #87ceeb; }
+        #info {
+            position: absolute; top: 15px; left: 15px; color: #333;
+            background: rgba(255,255,255,0.9); padding: 15px 20px; border-radius: 8px;
+            pointer-events: none; z-index: 100; border: 1px solid #ddd;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h3 { margin: 0 0 8px 0; color: #8b5a2b; font-size: 18px;}
+        p { margin: 0; font-size: 13px; color: #666; }
+        .lil-gui { 
+            --background-color: #2b2b2b; --text-color: #eee;
+            --title-background-color: #1a1a1a; --widget-color: #444;
+            --hover-color: #555; --focus-color: #007bff;
+            border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+        }
+        .lil-gui .title { font-weight: 600; letter-spacing: 0.5px; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+                "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="info">
+        <h3>Designing Timber Structures</h3>
+        <p>Left-click: Rotate | Right-click: Pan | Scroll: Zoom</p>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import GUI from 'lil-gui';
+
+        // --- Scene & Renderer ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87ceeb); // Sky blue
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.localClippingEnabled = true; 
+        document.body.appendChild(renderer.domElement);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 1000);
+        camera.position.set(20, 15, 30);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(8, 4, 8);
+        controls.enableDamping = true; 
+        controls.dampingFactor = 0.05; 
+        controls.zoomSpeed = 0.4;
+        controls.update();
+
+        // --- Environment ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+        dirLight.position.set(30, 50, 20);
+        scene.add(dirLight);
+
+        const groundGeo = new THREE.PlaneGeometry(500, 500);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x8fbc8f, depthWrite: false });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.01; 
+        scene.add(ground);
+
+        // --- Scale Figure ---
+        function createScaleFigure() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3a3a3a'; 
+            ctx.beginPath();
+            ctx.arc(32, 18, 9, 0, Math.PI * 2); // Head
+            ctx.moveTo(20, 32); ctx.quadraticCurveTo(32, 28, 44, 32); ctx.lineTo(38, 75); ctx.lineTo(26, 75); // Torso
+            ctx.moveTo(26, 75); ctx.lineTo(28, 122); ctx.lineTo(21, 122); ctx.lineTo(24, 75); // L Leg
+            ctx.moveTo(38, 75); ctx.lineTo(43, 122); ctx.lineTo(36, 122); ctx.lineTo(34, 75); // R Leg
+            ctx.fill();
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(1.78 * (64/128), 1.78, 1); 
+            sprite.position.set(-2, 1.78 / 2, -2); 
+            scene.add(sprite);
+        }
+        createScaleFigure();
+
+        // --- Groups & Materials ---
+        const buildingGroup = new THREE.Group();
+        scene.add(buildingGroup);
+
+        const sectionPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 40); // Default to Plan view
+        const matSettings = { roughness: 0.8, side: THREE.DoubleSide, clippingPlanes: [sectionPlane], polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+        const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x222222, linewidth: 1, clippingPlanes: [sectionPlane] });
+
+        const materials = {
+            glulam: new THREE.MeshStandardMaterial({ color: 0xd4a373, ...matSettings }), // Warm golden brown
+            osb: new THREE.MeshStandardMaterial({ color: 0xe6cc98, roughness: 1.0, ...matSettings }), // Pale textured board
+            clt: new THREE.MeshStandardMaterial({ color: 0xcda67c, ...matSettings }), // Solid structural wood
+            glass: new THREE.MeshStandardMaterial({ color: 0xadd8e6, transparent: true, opacity: 0.4, ...matSettings }),
+            concrete: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9, ...matSettings })
+        };
+
+        // Section Cap Logic
+        const capMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 1.0, side: THREE.DoubleSide, stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp });
+        const capGeo = new THREE.PlaneGeometry(200, 200);
+        const capMesh = new THREE.Mesh(capGeo, capMat);
+        capMesh.renderOrder = 1; 
+        scene.add(capMesh);
+
+        const backStencilMat = new THREE.MeshBasicMaterial({ depthWrite: false, depthTest: false, colorWrite: false, stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc, side: THREE.BackSide, stencilFail: THREE.IncrementWrapStencilOp, stencilZFail: THREE.IncrementWrapStencilOp, stencilZPass: THREE.IncrementWrapStencilOp, clippingPlanes: [sectionPlane] });
+        const frontStencilMat = new THREE.MeshBasicMaterial({ depthWrite: false, depthTest: false, colorWrite: false, stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc, side: THREE.FrontSide, stencilFail: THREE.DecrementWrapStencilOp, stencilZFail: THREE.DecrementWrapStencilOp, stencilZPass: THREE.DecrementWrapStencilOp, clippingPlanes: [sectionPlane] });
+
+        function createSolidWithEdges(geometry, material) {
+            const group = new THREE.Group();
+            const mesh = new THREE.Mesh(geometry, material);
+            group.add(mesh);
+            const bMesh = new THREE.Mesh(geometry, backStencilMat);
+            const fMesh = new THREE.Mesh(geometry, frontStencilMat);
+            bMesh.renderOrder = -1; fMesh.renderOrder = -1;
+            group.add(bMesh, fMesh);
+            const edges = new THREE.EdgesGeometry(geometry, 5);
+            const line = new THREE.LineSegments(edges, edgeMaterial);
+            group.add(line);
+            return group;
+        }
+
+        // Replaces fragile ExtrudeGeometry with 100% stable stacked solid BoxGeometries
+        function createWallWithWindows(width, height, thickness, isZAligned, material, numBays = 0, baySpan = 0) {
+            const shape = new THREE.Shape();
+            shape.moveTo(-width/2, -height/2);
+            shape.lineTo( width/2, -height/2);
+            shape.lineTo( width/2,  height/2);
+            shape.lineTo(-width/2,  height/2);
+            shape.lineTo(-width/2, -height/2);
+
+            if (numBays > 0 && baySpan > 0) {
+                // Bay-aligned: one window centred per bay
+                const windowW = Math.min(baySpan * 0.4, 1.4);
+                const windowH = height * 0.45;
+                const sillH   = -height / 2 + height * 0.25;
+                for (let b = 0; b < numBays; b++) {
+                    const cx = -width / 2 + (b + 0.5) * baySpan;
+                    const hole = new THREE.Path();
+                    hole.moveTo(cx - windowW/2, sillH);
+                    hole.lineTo(cx - windowW/2, sillH + windowH);
+                    hole.lineTo(cx + windowW/2, sillH + windowH);
+                    hole.lineTo(cx + windowW/2, sillH);
+                    hole.lineTo(cx - windowW/2, sillH);
+                    shape.holes.push(hole);
+                }
+            } else {
+                // Legacy fallback (3m spacing) — kept for any call without bay params
+                const windowW = 1.2, windowH = 1.5, sillH = -height / 2 + 0.8;
+                for (let w = -width/2 + 2; w < width/2 - 1.5; w += 3.0) {
+                    const hole = new THREE.Path();
+                    hole.moveTo(w - windowW/2, sillH);
+                    hole.lineTo(w - windowW/2, sillH + windowH);
+                    hole.lineTo(w + windowW/2, sillH + windowH);
+                    hole.lineTo(w + windowW/2, sillH);
+                    hole.lineTo(w - windowW/2, sillH);
+                    shape.holes.push(hole);
+                }
+            }
+
+            const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+            geo.center();
+            if (isZAligned) geo.rotateY(Math.PI / 2);
+
+            const group = new THREE.Group();
+            const mesh  = new THREE.Mesh(geo, material);
+            const bMesh = new THREE.Mesh(geo, backStencilMat);
+            const fMesh = new THREE.Mesh(geo, frontStencilMat);
+            bMesh.renderOrder = -1; fMesh.renderOrder = -1;
+            group.add(mesh, bMesh, fMesh);
+            group.add(drawShapeOutline(shape, thickness, isZAligned)); // ← clean manual outline, no triangulation artifacts
+            return group;
+        }
+
+        function drawShapeOutline(shape, thickness, isZAligned) {
+            const hw = thickness / 2;
+            const verts = [];
+            function addLoop(pts, z) {
+                for (let i = 0; i < pts.length; i++) {
+                    const a = pts[i], b = pts[(i + 1) % pts.length];
+                    verts.push(a.x, a.y, z, b.x, b.y, z);
+                }
+            }
+            function addDepth(pts) {
+                for (const p of pts) verts.push(p.x, p.y, -hw, p.x, p.y, hw);
+            }
+            const outer = shape.getPoints();
+            addLoop(outer, -hw); addLoop(outer, hw); addDepth(outer);
+            for (const hole of shape.holes) {
+                const hp = hole.getPoints();
+                addLoop(hp, -hw); addLoop(hp, hw); addDepth(hp);
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+            if (isZAligned) geo.rotateY(Math.PI / 2);
+            return new THREE.LineSegments(geo, edgeMaterial);
+        }
+
+        function createMassTimberWall(width, height, thickness, isZAligned, material, numBays, baySpan) {
+            const shape = new THREE.Shape();
+            shape.moveTo(-width/2, -height/2);
+            shape.lineTo( width/2, -height/2);
+            shape.lineTo( width/2,  height/2);
+            shape.lineTo(-width/2,  height/2);
+            shape.lineTo(-width/2, -height/2);
+
+            const windowW = Math.min(baySpan * 0.45, 1.6); // 45% of bay, max 1.6m
+            const windowH = height * 0.45;
+            const sillH   = -height/2 + height * 0.25;     // sill at 25% up
+
+            for (let b = 0; b < numBays; b++) {
+                const cx = -width/2 + (b + 0.5) * baySpan;  // centered in each bay
+                const hole = new THREE.Path();
+                hole.moveTo(cx - windowW/2, sillH);
+                hole.lineTo(cx - windowW/2, sillH + windowH);
+                hole.lineTo(cx + windowW/2, sillH + windowH);
+                hole.lineTo(cx + windowW/2, sillH);
+                hole.lineTo(cx - windowW/2, sillH);
+                shape.holes.push(hole);
+            }
+
+            const geo = new THREE.ExtrudeGeometry(shape, { depth: thickness, bevelEnabled: false });
+            geo.center();
+            if (isZAligned) geo.rotateY(Math.PI / 2);
+            return createSolidWithEdges(geo, material);
+        }
+
+        function isInsideWindow(pos, gridCount, span) {
+            const ww = Math.min(span * 0.4, 1.4);
+            for (let b = 0; b < gridCount; b++) {
+                const c = b * span + span / 2;
+                if (pos > c - ww / 2 && pos < c + ww / 2) return true;
+            }
+            return false;
+        }
+
+        function clearGroup(group) {
+            while(group.children.length > 0) {
+                const child = group.children[0];
+                if(child.geometry) child.geometry.dispose();
+                if(child.children.length > 0) clearGroup(child);
+                group.remove(child);
+            }
+        }
+
+        // --- Parameters ---
+        const params = {
+            storyCount: 2, storyHeight: 3.0,
+            gridCountX: 3, gridCountY: 2,
+            spanX: 6.0, spanY: 5.0,
+            
+            structuralSystem: 'Timber Post & Beam', // 'Lightweight Timber Frame', 'Timber Post & Beam', 'Mass Timber'
+            
+            // System specific params
+            showOSB: true,
+            postBeamFloor: 'Secondary Beams + Decking', // 'Secondary Beams + Decking', 'CLT Panel'
+            columnSize: 0.3,
+
+            cutAxis: 'Z-Axis (Height - Plan View)', sectionCut: 40,
+        };
+
+        // --- Geometry Generation ---
+        function generateBuilding() {
+            clearGroup(buildingGroup);
+
+            const totalWidth = params.gridCountX * params.spanX;
+            const totalDepth = params.gridCountY * params.spanY;
+            const isXLonger = params.spanX >= params.spanY;
+            const longSpan = isXLonger ? params.spanX : params.spanY;
+
+            // --- FOUNDATIONS ---
+            const fDepth = 0.6; // 60cm deep foundation
+            const fWidth = 0.4; // 40cm wide strip
+            const padSize = 0.8; // 80cm pad footing
+
+            if (params.structuralSystem === 'Lightweight Timber Frame' || params.structuralSystem === 'Mass Timber') {
+                const stripGeoX = new THREE.BoxGeometry(totalWidth + fWidth, fDepth, fWidth);
+                const stripGeoZ = new THREE.BoxGeometry(fWidth, fDepth, totalDepth + fWidth);
+                for (let y = 0; y <= params.gridCountY; y++) {
+                    const strip = createSolidWithEdges(stripGeoX, materials.concrete);
+                    strip.position.set(totalWidth/2, -fDepth/2, y * params.spanY);
+                    buildingGroup.add(strip);
+                }
+                for (let x = 0; x <= params.gridCountX; x++) {
+                    const strip = createSolidWithEdges(stripGeoZ, materials.concrete);
+                    strip.position.set(x * params.spanX, -fDepth/2, totalDepth/2);
+                    buildingGroup.add(strip);
+                }
+            } else if (params.structuralSystem === 'Timber Post & Beam') {
+                const padGeo = new THREE.BoxGeometry(padSize, fDepth, padSize);
+                const tieGeoX = new THREE.BoxGeometry(params.spanX, fDepth/2, fWidth);
+                const tieGeoZ = new THREE.BoxGeometry(fWidth, fDepth/2, params.spanY);
+                for (let x = 0; x <= params.gridCountX; x++) {
+                    for (let y = 0; y <= params.gridCountY; y++) {
+                        const pad = createSolidWithEdges(padGeo, materials.concrete);
+                        pad.position.set(x * params.spanX, -fDepth/2, y * params.spanY);
+                        buildingGroup.add(pad);
+                        if (x < params.gridCountX) {
+                            const tieX = createSolidWithEdges(tieGeoX, materials.concrete);
+                            tieX.position.set(x * params.spanX + params.spanX/2, -fDepth/4, y * params.spanY);
+                            buildingGroup.add(tieX);
+                        }
+                        if (y < params.gridCountY) {
+                            const tieZ = createSolidWithEdges(tieGeoZ, materials.concrete);
+                            tieZ.position.set(x * params.spanX, -fDepth/4, y * params.spanY + params.spanY/2);
+                            buildingGroup.add(tieZ);
+                        }
+                    }
+                }
+            }
+
+            for (let s = 0; s < params.storyCount; s++) {
+                const floorY = s * params.storyHeight;
+                const midY = floorY + params.storyHeight / 2;
+                const topY = floorY + params.storyHeight;
+
+                // =================================================================
+                // 1. LIGHTWEIGHT TIMBER FRAME
+                // =================================================================
+                if (params.structuralSystem === 'Lightweight Timber Frame') {
+                    const studWidth = 0.04; const studDepth = 0.14; 
+                    const studSpacing = 0.40; 
+                    
+                    const studGeoX = new THREE.BoxGeometry(studWidth, params.storyHeight, studDepth);
+                    const studGeoY = new THREE.BoxGeometry(studDepth, params.storyHeight, studWidth);
+                    const nogGeoX = new THREE.BoxGeometry(studSpacing - studWidth, studWidth, studDepth);
+                    const nogGeoY = new THREE.BoxGeometry(studDepth, studWidth, studSpacing - studWidth);
+                    
+                    const plateGeoX = new THREE.BoxGeometry(totalWidth, studWidth, studDepth);
+                    const plateGeoY = new THREE.BoxGeometry(studDepth, studWidth, totalDepth);
+
+                    const winSillH = 0.8; const winTopH = 2.3;
+                    const lowStudGeoX = new THREE.BoxGeometry(studWidth, winSillH, studDepth);
+                    const upStudGeoX = new THREE.BoxGeometry(studWidth, params.storyHeight - winTopH, studDepth);
+                    const lowStudGeoY = new THREE.BoxGeometry(studDepth, winSillH, studWidth);
+                    const upStudGeoY = new THREE.BoxGeometry(studDepth, params.storyHeight - winTopH, studWidth);
+
+                    const osbThickness = 0.02;
+
+                    // X-Axis Walls
+                    for (let y = 0; y <= params.gridCountY; y++) {
+                        const zPos = y * params.spanY;
+                        const isExterior = (y === 0 || y === params.gridCountY);
+                        
+                        // Continuous Bottom and Top Plates
+                        const botPlate = createSolidWithEdges(plateGeoX, materials.clt); botPlate.position.set(totalWidth/2, floorY + studWidth/2, zPos); buildingGroup.add(botPlate);
+                        const topPlate = createSolidWithEdges(plateGeoX, materials.clt); topPlate.position.set(totalWidth/2, topY - studWidth/2, zPos); buildingGroup.add(topPlate);
+
+                        if (isExterior) {
+                            const wWX = Math.min(params.spanX * 0.4, 1.4);
+                            const headerGeo = new THREE.BoxGeometry(wWX, 0.14, studDepth);
+                            const sillGeo   = new THREE.BoxGeometry(wWX, studWidth, studDepth);
+                            const jackGeo   = new THREE.BoxGeometry(studWidth, winTopH, studDepth);
+
+                            for (let b = 0; b < params.gridCountX; b++) {
+                                const w = b * params.spanX + params.spanX / 2;
+                                const header = createSolidWithEdges(headerGeo, materials.clt); header.position.set(w, floorY + winTopH + 0.07, zPos); buildingGroup.add(header);
+                                const sill   = createSolidWithEdges(sillGeo,   materials.clt); sill.position.set(w, floorY + winSillH - 0.02, zPos); buildingGroup.add(sill);
+                                const jLeft  = createSolidWithEdges(jackGeo,   materials.clt); jLeft.position.set(w - wWX/2 + studWidth/2, floorY + winTopH/2, zPos); buildingGroup.add(jLeft);
+                                const jRight = createSolidWithEdges(jackGeo,   materials.clt); jRight.position.set(w + wWX/2 - studWidth/2, floorY + winTopH/2, zPos); buildingGroup.add(jRight);
+                                const kLeft  = createSolidWithEdges(studGeoX,  materials.clt); kLeft.position.set(w - wWX/2 - studWidth/2, midY, zPos); buildingGroup.add(kLeft);
+                                const kRight = createSolidWithEdges(studGeoX,  materials.clt); kRight.position.set(w + wWX/2 + studWidth/2, midY, zPos); buildingGroup.add(kRight);
+                            }
+                        }
+
+                        for (let xPos = 0; xPos <= totalWidth; xPos += studSpacing) {
+                            if (isExterior && isInsideWindow(xPos, params.gridCountX, params.spanX)) {
+                                const lStud = createSolidWithEdges(lowStudGeoX, materials.clt); lStud.position.set(xPos, floorY + winSillH/2, zPos); buildingGroup.add(lStud);
+                                const uStud = createSolidWithEdges(upStudGeoX, materials.clt); uStud.position.set(xPos, floorY + winTopH + (params.storyHeight-winTopH)/2, zPos); buildingGroup.add(uStud);
+                                continue;
+                            }
+                            if (isExterior) { const wWX = Math.min(params.spanX * 0.4, 1.4); const isKing = Array.from({length: params.gridCountX}, (_, b) => b * params.spanX + params.spanX/2).some(wc => Math.abs(xPos-(wc-wWX/2-studWidth/2)) < 0.02 || Math.abs(xPos-(wc+wWX/2+studWidth/2)) < 0.02); if (isKing) continue; }
+
+                            const stud = createSolidWithEdges(studGeoX, materials.clt); stud.position.set(xPos, midY, zPos); buildingGroup.add(stud);
+                            
+                            if (xPos + studSpacing <= totalWidth && !(isExterior && isInsideWindow(xPos + studSpacing/2))) {
+                                const nog1 = createSolidWithEdges(nogGeoX, materials.clt); nog1.position.set(xPos + studSpacing/2, floorY + params.storyHeight/3, zPos); buildingGroup.add(nog1);
+                                const nog2 = createSolidWithEdges(nogGeoX, materials.clt); nog2.position.set(xPos + studSpacing/2, floorY + 2*params.storyHeight/3, zPos); buildingGroup.add(nog2);
+                            }
+                        }
+                        if (params.showOSB && isExterior) {
+                            const osb = createWallWithWindows(totalWidth, params.storyHeight, osbThickness, false, materials.osb, params.gridCountX, params.spanX); 
+                            osb.position.set(totalWidth/2, midY, zPos + ((y===0) ? -studDepth/2 - osbThickness/2 : studDepth/2 + osbThickness/2));
+                            buildingGroup.add(osb);
+                        }
+                    }
+
+                    // Y-Axis Walls (Z in 3D)
+                    for (let x = 0; x <= params.gridCountX; x++) {
+                        const xPos = x * params.spanX;
+                        const isExterior = (x === 0 || x === params.gridCountX);
+
+                        const botPlate = createSolidWithEdges(plateGeoY, materials.clt); botPlate.position.set(xPos, floorY + studWidth/2, totalDepth/2); buildingGroup.add(botPlate);
+                        const topPlate = createSolidWithEdges(plateGeoY, materials.clt); topPlate.position.set(xPos, topY - studWidth/2, totalDepth/2); buildingGroup.add(topPlate);
+
+                            if (isExterior) {
+                                const wWY = Math.min(params.spanY * 0.4, 1.4);
+                                const headerGeoY = new THREE.BoxGeometry(studDepth, 0.14, wWY);
+                                const sillGeoY   = new THREE.BoxGeometry(studDepth, studWidth, wWY);
+                                const jackGeoY   = new THREE.BoxGeometry(studDepth, winTopH, studWidth);
+
+                                for (let b = 0; b < params.gridCountY; b++) {
+                                    const w = b * params.spanY + params.spanY / 2;
+                                    const header = createSolidWithEdges(headerGeoY, materials.clt); header.position.set(xPos, floorY + winTopH + 0.07, w); buildingGroup.add(header);
+                                    const sill   = createSolidWithEdges(sillGeoY,   materials.clt); sill.position.set(xPos, floorY + winSillH - 0.02, w); buildingGroup.add(sill);
+                                    const jLeft  = createSolidWithEdges(jackGeoY,   materials.clt); jLeft.position.set(xPos, floorY + winTopH/2, w - wWY/2 + studWidth/2); buildingGroup.add(jLeft);
+                                    const jRight = createSolidWithEdges(jackGeoY,   materials.clt); jRight.position.set(xPos, floorY + winTopH/2, w + wWY/2 - studWidth/2); buildingGroup.add(jRight);
+                                    const kLeft  = createSolidWithEdges(studGeoY,   materials.clt); kLeft.position.set(xPos, midY, w - wWY/2 - studWidth/2); buildingGroup.add(kLeft);
+                                    const kRight = createSolidWithEdges(studGeoY,   materials.clt); kRight.position.set(xPos, midY, w + wWY/2 + studWidth/2); buildingGroup.add(kRight);
+                                }
+                            }
+
+                        for (let zPos = 0; zPos <= totalDepth; zPos += studSpacing) {
+                            if (Math.abs(zPos % params.spanY) > 0.1) { 
+                                if (isExterior && isInsideWindow(zPos, params.gridCountY, params.spanY)) {
+                                    const lStud = createSolidWithEdges(lowStudGeoY, materials.clt); lStud.position.set(xPos, floorY + winSillH/2, zPos); buildingGroup.add(lStud);
+                                    const uStud = createSolidWithEdges(upStudGeoY, materials.clt); uStud.position.set(xPos, floorY + winTopH + (params.storyHeight-winTopH)/2, zPos); buildingGroup.add(uStud);
+                                    continue;
+                                }
+                                if (isExterior) { const wWY = Math.min(params.spanY * 0.4, 1.4); const isKing = Array.from({length: params.gridCountY}, (_, b) => b * params.spanY + params.spanY/2).some(wc => Math.abs(zPos-(wc-wWY/2-studWidth/2)) < 0.02 || Math.abs(zPos-(wc+wWY/2+studWidth/2)) < 0.02); if (isKing) continue; }
+
+                                const stud = createSolidWithEdges(studGeoY, materials.clt); stud.position.set(xPos, midY, zPos); buildingGroup.add(stud);
+
+                                if (zPos + studSpacing <= totalDepth && Math.abs((zPos + studSpacing) % params.spanY) > 0.1 && !(isExterior && isInsideWindow(zPos + studSpacing/2))) {
+                                    const nog1 = createSolidWithEdges(nogGeoY, materials.clt); nog1.position.set(xPos, floorY + params.storyHeight/3, zPos + studSpacing/2); buildingGroup.add(nog1);
+                                    const nog2 = createSolidWithEdges(nogGeoY, materials.clt); nog2.position.set(xPos, floorY + 2*params.storyHeight/3, zPos + studSpacing/2); buildingGroup.add(nog2);
+                                }
+                            }
+                        }
+                        if (params.showOSB && isExterior) {
+                            const osb = createWallWithWindows(totalDepth, params.storyHeight, osbThickness, true, materials.osb, params.gridCountY, params.spanY); 
+                            osb.position.set(xPos + ((x===0) ? -studDepth/2 - osbThickness/2 : studDepth/2 + osbThickness/2), midY, totalDepth/2);
+                            buildingGroup.add(osb);
+                        }
+                    }
+
+                    // Floors & Trusses
+                    if (s < params.storyCount - 1) { 
+                        const joistW = 0.04; const joistD = 0.24;
+                        const joistGeo = new THREE.BoxGeometry(isXLonger ? joistW : totalWidth, joistD, isXLonger ? totalDepth : joistW);
+                        const loopLimit = isXLonger ? totalWidth : totalDepth;
+                        for (let pos = 0; pos <= loopLimit; pos += studSpacing) {
+                            const joist = createSolidWithEdges(joistGeo, materials.clt);
+                            if (isXLonger) joist.position.set(pos, topY + joistD/2, totalDepth/2); else joist.position.set(totalWidth/2, topY + joistD/2, pos);
+                            buildingGroup.add(joist);
+                        }
+                        const subfloorGeo = new THREE.BoxGeometry(totalWidth, 0.02, totalDepth);
+                        const subfloor = createSolidWithEdges(subfloorGeo, materials.osb);
+                        subfloor.position.set(totalWidth/2, topY + joistD + 0.01, totalDepth/2); buildingGroup.add(subfloor);
+                    } 
+                    else { 
+                        const isXShort = totalWidth <= totalDepth;
+                        const roofSpan = isXShort ? totalWidth : totalDepth;
+                        const roofLength = isXShort ? totalDepth : totalWidth;
+                        const roofHeight = roofSpan / 3; 
+                        const overhang = 0.5; 
+
+                        const rafterW = 0.04; const rafterD = 0.14; 
+                        const pitchAngle = Math.atan(roofHeight / (roofSpan/2));
+                        const rafterLen = Math.sqrt(Math.pow(roofSpan/2 + overhang, 2) + Math.pow(roofHeight + (overhang * Math.tan(pitchAngle)), 2));
+
+                        const rafterGeo = new THREE.BoxGeometry(rafterW, rafterLen, rafterD);
+                        const botChordGeo = new THREE.BoxGeometry(roofSpan, rafterW, rafterD);
+
+                        for (let pos = 0; pos <= roofLength; pos += studSpacing) {
+                            const trussGrp = new THREE.Group();
+                            
+                            const botChord = createSolidWithEdges(botChordGeo, materials.clt); botChord.position.set(0, rafterW/2, 0); trussGrp.add(botChord);
+                            
+                            // Left rafter points UP/RIGHT (Negative Z rotation) | Right points UP/LEFT (Positive Z rotation)
+                            const lRaft = createSolidWithEdges(rafterGeo, materials.clt); lRaft.position.set(-roofSpan/4 - overhang/2, roofHeight/2, 0); lRaft.rotation.z = -(Math.PI/2 - pitchAngle); trussGrp.add(lRaft);
+                            const rRaft = createSolidWithEdges(rafterGeo, materials.clt); rRaft.position.set(roofSpan/4 + overhang/2, roofHeight/2, 0); rRaft.rotation.z = (Math.PI/2 - pitchAngle); trussGrp.add(rRaft);
+
+                            if (isXShort) { trussGrp.position.set(totalWidth/2, topY, pos); } 
+                            else { trussGrp.rotation.y = Math.PI/2; trussGrp.position.set(pos, topY, totalDepth/2); }
+                            buildingGroup.add(trussGrp);
+                        }
+
+                        if (params.showOSB) {
+                            const roofShell = new THREE.Shape();
+                            roofShell.moveTo(-roofSpan/2 - overhang, -0.05);
+                            roofShell.lineTo(0, roofHeight + overhang/2 - 0.05);
+                            roofShell.lineTo(roofSpan/2 + overhang, -0.05);
+                            roofShell.lineTo(roofSpan/2 + overhang, 0);
+                            roofShell.lineTo(0, roofHeight + overhang/2);
+                            roofShell.lineTo(-roofSpan/2 - overhang, 0);
+                            
+                            const roofGeo = new THREE.ExtrudeGeometry(roofShell, { depth: roofLength + (overhang*2), bevelEnabled: false });
+                            roofGeo.center();
+                            if (!isXShort) roofGeo.rotateY(Math.PI / 2);
+                            
+                            const roof = createSolidWithEdges(roofGeo, materials.osb);
+                            roof.position.set(totalWidth/2, topY + roofHeight/2, totalDepth/2);
+                            buildingGroup.add(roof);
+                        }
+                    }
+                }
+
+                // =================================================================
+                // 2. TIMBER POST & BEAM (GLULAM)
+                // =================================================================
+                else if (params.structuralSystem === 'Timber Post & Beam') {
+                    const safeSize = params.columnSize - 0.002; 
+                    const safeHeight = params.storyHeight - 0.002;
+                    const colGeo = new THREE.BoxGeometry(safeSize, safeHeight, safeSize);
+                    
+                    // Columns
+                    for (let x = 0; x <= params.gridCountX; x++) {
+                        for (let y = 0; y <= params.gridCountY; y++) {
+                            const col = createSolidWithEdges(colGeo, materials.glulam);
+                            col.position.set(x * params.spanX, midY, y * params.spanY);
+                            buildingGroup.add(col);
+                        }
+                    }
+
+                    // Primary Beams (L/15 Depth)
+                    const dPrim = longSpan / 15; const wPrim = params.columnSize;
+                    const beamGeoX = new THREE.BoxGeometry(totalWidth, dPrim, wPrim);
+                    const beamGeoY = new THREE.BoxGeometry(wPrim, dPrim, totalDepth);
+                    
+                    for(let y=0; y<=params.gridCountY; y++) {
+                        const beam = createSolidWithEdges(beamGeoX, materials.glulam);
+                        beam.position.set(totalWidth/2, topY - dPrim/2, y * params.spanY); buildingGroup.add(beam);
+                    }
+                    for(let x=0; x<=params.gridCountX; x++) {
+                        const beam = createSolidWithEdges(beamGeoY, materials.glulam);
+                        beam.position.set(x * params.spanX, topY - dPrim/2, totalDepth/2); buildingGroup.add(beam);
+                    }
+
+                    // Floor Systems
+                    if (params.postBeamFloor === 'CLT Panel') {
+                        const cltThick = longSpan / 25;
+                        const slabGeo = new THREE.BoxGeometry(totalWidth + params.columnSize, cltThick, totalDepth + params.columnSize);
+                        const slab = createSolidWithEdges(slabGeo, materials.clt);
+                        slab.position.set(totalWidth/2, topY + cltThick/2, totalDepth/2);
+                        buildingGroup.add(slab);
+                    } 
+                    else { // Secondary Beams + Decking
+                        const shortSpan = isXLonger ? params.spanY : params.spanX;
+                        const dSec = shortSpan / 20; const wSec = shortSpan / 45;
+                        const secSpacing = 1.0; 
+                        
+                        const secGeoX = new THREE.BoxGeometry(totalWidth, dSec, wSec);
+                        const secGeoY = new THREE.BoxGeometry(wSec, dSec, totalDepth);
+
+                        const loopLimit = isXLonger ? totalWidth : totalDepth;
+                        for (let pos = secSpacing; pos < loopLimit; pos += secSpacing) {
+                            // Don't draw on top of primary grids
+                            if (Math.abs(pos % (isXLonger ? params.spanX : params.spanY)) < 0.1) continue; 
+                            
+                            const sec = createSolidWithEdges(isXLonger ? secGeoY : secGeoX, materials.glulam);
+                            if (isXLonger) sec.position.set(pos, topY - dSec/2, totalDepth/2);
+                            else sec.position.set(totalWidth/2, topY - dSec/2, pos);
+                            buildingGroup.add(sec);
+                        }
+
+                        // Timber Decking
+                        const deckGeo = new THREE.BoxGeometry(totalWidth + params.columnSize, 0.05, totalDepth + params.columnSize);
+                        const deck = createSolidWithEdges(deckGeo, materials.osb);
+                        deck.position.set(totalWidth/2, topY + 0.025, totalDepth/2);
+                        buildingGroup.add(deck);
+                    }
+                }
+
+                // =================================================================
+                // 3. MASS TIMBER (CLT WALLS + SLABS)
+                // =================================================================
+                else if (params.structuralSystem === 'Mass Timber') {
+                    const wallThick = 0.20;
+                    const gap = 0.002; // 2mm clearance — prevents any face coplanarity
+                    const widthX = totalWidth + wallThick;
+                    const widthZ = totalDepth - wallThick;
+
+                    // Perimeter walls — pass bay params for aligned windows, uses drawShapeOutline automatically
+                    const frontWall = createWallWithWindows(widthX, params.storyHeight, wallThick, false, materials.clt, params.gridCountX, params.spanX);
+                    frontWall.position.set(totalWidth/2, midY, 0); buildingGroup.add(frontWall);
+
+                    const backWall = createWallWithWindows(widthX, params.storyHeight, wallThick, false, materials.clt, params.gridCountX, params.spanX);
+                    backWall.position.set(totalWidth/2, midY, totalDepth); buildingGroup.add(backWall);
+
+                    const leftWall = createWallWithWindows(widthZ, params.storyHeight, wallThick, true, materials.clt, params.gridCountY, params.spanY);
+                    leftWall.position.set(0, midY, totalDepth/2); buildingGroup.add(leftWall);
+
+                    const rightWall = createWallWithWindows(widthZ, params.storyHeight, wallThick, true, materials.clt, params.gridCountY, params.spanY);
+                    rightWall.position.set(totalWidth, midY, totalDepth/2); buildingGroup.add(rightWall);
+
+                    // Inner X-direction walls — slightly narrower than inner Z-wall gap so end-faces never touch outer Z-wall faces
+                    const innerWallXGeo = new THREE.BoxGeometry(totalWidth - wallThick - gap, params.storyHeight, wallThick);
+                    for (let y = 1; y < params.gridCountY; y++) {
+                        const innerWall = createSolidWithEdges(innerWallXGeo, materials.clt);
+                        innerWall.position.set(totalWidth/2, midY, y * params.spanY);
+                        buildingGroup.add(innerWall);
+                    }
+
+                    // Inner Z-direction walls — slightly shorter than inner X-wall gap so end-faces never touch outer X-wall faces
+                    const innerWallZGeo = new THREE.BoxGeometry(wallThick, params.storyHeight, totalDepth - wallThick - gap);
+                    for (let x = 1; x < params.gridCountX; x++) {
+                        const innerWall = createSolidWithEdges(innerWallZGeo, materials.clt);
+                        innerWall.position.set(x * params.spanX, midY, totalDepth/2);
+                        buildingGroup.add(innerWall);
+                    }
+
+                    // CLT Slab — inset from wall faces, and sunk by gap/2 so wall-top faces are buried underneath
+                    const cltThick = longSpan / 25;
+                    const slabGeo = new THREE.BoxGeometry(totalWidth - wallThick - gap, cltThick, totalDepth - wallThick - gap);
+                    const slab = createSolidWithEdges(slabGeo, materials.clt);
+                    slab.position.set(totalWidth/2, topY + cltThick/2 - gap/2, totalDepth/2);
+                    buildingGroup.add(slab);
+                }
+            }
+            controls.target.set(totalWidth/2, (params.storyCount * params.storyHeight)/2, totalDepth/2);
+        }
+
+        // --- GUI Setup ---
+        const gui = new GUI({ title: 'Timber Parameters' });
+
+        const folderGeneral = gui.addFolder('Building Grid');
+        folderGeneral.add(params, 'storyCount', 1, 8, 1).name('Story Count').onChange(generateBuilding);
+        folderGeneral.add(params, 'storyHeight', 2.5, 5.0, 0.1).name('Story Height (m)').onChange(generateBuilding);
+        folderGeneral.add(params, 'gridCountX', 1, 8, 1).name('Grid Count X').onChange(generateBuilding);
+        folderGeneral.add(params, 'gridCountY', 1, 8, 1).name('Grid Count Y').onChange(generateBuilding);
+        folderGeneral.add(params, 'spanX', 3, 12, 0.5).name('X Span Length (m)').onChange(generateBuilding);
+        folderGeneral.add(params, 'spanY', 3, 12, 0.5).name('Y Span Length (m)').onChange(generateBuilding);
+
+        const folderSystem = gui.addFolder('Structural System');
+        folderSystem.add(params, 'structuralSystem', [
+            'Lightweight Timber Frame', 'Timber Post & Beam', 'Mass Timber'
+        ]).name('System Type').onChange(() => {
+            updateDynamicGUI(); generateBuilding();
+        });
+
+        let dynamicFolder;
+        function updateDynamicGUI() {
+            if(dynamicFolder) dynamicFolder.destroy();
+            
+            dynamicFolder = folderSystem.addFolder('System Details');
+            
+            if (params.structuralSystem === 'Lightweight Timber Frame') {
+                dynamicFolder.add(params, 'showOSB').name('Show OSB Sheathing').onChange(generateBuilding);
+            } 
+            else if (params.structuralSystem === 'Timber Post & Beam') {
+                dynamicFolder.add(params, 'columnSize', 0.2, 0.8, 0.05).name('Glulam Column Size').onChange(generateBuilding);
+                dynamicFolder.add(params, 'postBeamFloor', ['Secondary Beams + Decking', 'CLT Panel']).name('Floor System').onChange(generateBuilding);
+            }
+            else if (params.structuralSystem === 'Mass Timber') {
+                // Informational text since it calculates automatically
+                dynamicFolder.add({ info: 'AUTO' }, 'info').name('Rule:');
+            }
+        }
+
+        const folderView = gui.addFolder('Visualization');
+        folderView.add(params, 'cutAxis', ['X-Axis (Width)', 'Y-Axis (Depth)', 'Z-Axis (Height - Plan View)']).name('Cut Direction').onChange((val) => {
+            if (val === 'X-Axis (Width)') sectionPlane.normal.set(-1, 0, 0);
+            else if (val === 'Y-Axis (Depth)') sectionPlane.normal.set(0, 0, -1);
+            else sectionPlane.normal.set(0, -1, 0);
+        });
+        folderView.add(params, 'sectionCut', -10, 100, 0.5).name('Slide Section Cut').onChange((val) => {
+            sectionPlane.constant = val;
+        });
+        
+        const viewActions = {
+            snapToSection: function() {
+                const cutVal = params.sectionCut;
+                const dist = 30; 
+                const cX = (params.gridCountX * params.spanX) / 2;
+                const cZ = (params.gridCountY * params.spanY) / 2;
+                const tY = (params.storyCount * params.storyHeight) / 2;
+
+                if (params.cutAxis === 'X-Axis (Width)') { camera.position.set(cutVal + dist, tY, cZ); controls.target.set(cutVal, tY, cZ); } 
+                else if (params.cutAxis === 'Y-Axis (Depth)') { camera.position.set(cX, tY, cutVal + dist); controls.target.set(cX, tY, cutVal); } 
+                else { camera.position.set(cX, cutVal + dist, cZ); controls.target.set(cX, cutVal, cZ); }
+                controls.update();
+            }
+        };
+        folderView.add(viewActions, 'snapToSection').name('Snap View to Cut');
+
+        updateDynamicGUI();
+        generateBuilding();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            capMesh.position.copy(sectionPlane.normal).multiplyScalar(-sectionPlane.constant);
+            capMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), sectionPlane.normal);
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
