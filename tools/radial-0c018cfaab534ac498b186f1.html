@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radial Grid Generator</title>
+    <style>
+        body {
+            font-family: 'Courier New', Courier, monospace;
+            max-width: 1050px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+            color: #000;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border: 2px solid #000;
+            box-shadow: 5px 5px 0px rgba(0,0,0,0.1);
+        }
+        .note-box {
+            background-color: #fff;
+            color: #000;
+            padding: 15px;
+            border: 2px solid #000;
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border: 2px dashed #d9534f;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            font-weight: bold;
+            display: none;
+        }
+        .layout-wrapper {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .controls {
+            flex: 1;
+            min-width: 350px;
+        }
+        .input-section {
+            padding: 20px;
+            border: 2px dashed #000;
+            background-color: #fafafa;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="number"] {
+            font-family: 'Courier New', Courier, monospace;
+            padding: 8px;
+            font-size: 1.1em;
+            border: 1px solid #000;
+            width: 120px;
+            background-color: #fff;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            border: 2px solid #000;
+            font-size: 1.05em;
+            background-color: #e8e8e8;
+            line-height: 1.6;
+        }
+        .result-value { font-weight: bold; color: #0275d8; }
+        .highlight { font-size: 1.1em; color: #d9534f; font-weight: bold; }
+        .dynamic-list { margin-left: 15px; }
+        
+        .visualizer {
+            flex: 1.5;
+            min-width: 550px;
+            display: flex;
+            flex-direction: column;
+        }
+        canvas {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border: 2px solid #000;
+            background-color: #fff;
+        }
+        .canvas-label {
+            text-align: center;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 5px;
+            margin-top: -2px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>[RADIAL GRID GENERATOR]</h2>
+    
+    <div class="note-box">
+        <strong>GEOMETRY RULES:</strong><br><br>
+        Input a target span for the outer perimeter and define the number of radial axes. The algorithm drafts the grid, locates columns at intersections, and calculates spans for every intermediate structural hoop. Radial axes converge at the absolute center.
+    </div>
+
+    <div class="layout-wrapper">
+        <div class="controls">
+            <div class="input-section">
+                <div class="input-group">
+                    <label>OUTER CIRCLE RADIUS (m):</label>
+                    <input type="number" id="rOut" value="20" step="0.5" min="1" oninput="calculateGrid()">
+                </div>
+                <div class="input-group">
+                    <label>TARGET OUTER SPAN (m):</label>
+                    <input type="number" id="sOut" value="6" step="0.1" min="0.1" oninput="calculateGrid()">
+                </div>
+                <div class="input-group">
+                    <label>INNER CIRCLE RADIUS (m):</label>
+                    <input type="number" id="rIn" value="5" step="0.5" min="0" oninput="calculateGrid()">
+                </div>
+                <div class="input-group">
+                    <label>NUMBER OF RADIAL GRIDS (≥2):</label>
+                    <input type="number" id="ringCount" value="3" step="1" min="2" oninput="calculateGrid()">
+                </div>
+            </div>
+
+            <div id="warningBox" class="warning-box">
+                !!! WARNING: RADIAL BAY SPAN IS TOO GREAT !!!<br>
+                Reduce this clear distance by increasing the 'Number of Radial Axes'.
+            </div>
+
+            <div id="results" class="results">
+                <strong>=== FINAL GRID SYSTEM ===</strong><br>
+                ● Total Radial Axes: <span class="highlight" id="outAxesCount">--</span><br>
+                ● Exact Angle per Axis: <span class="result-value" id="outAngle">--</span><br>
+                <br>
+                <strong>=== EXACT SPANS ===</strong><br>
+                <div id="spansList" class="dynamic-list">
+                    </div>
+                <br>
+                <strong>=== RADIAL DISTANCE ===</strong><br>
+                ● Clear Distance (Bay Depth): <span class="result-value" id="outDist">--</span>
+            </div>
+        </div>
+
+        <div class="visualizer">
+            <canvas id="gridCanvas" width="800" height="800"></canvas>
+            <div class="canvas-label">LIVE DRAFTING: GRID & COLUMNS</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gridCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function calculateGrid() {
+        const rOut = parseFloat(document.getElementById('rOut').value);
+        const targetSpan = parseFloat(document.getElementById('sOut').value);
+        const rIn = parseFloat(document.getElementById('rIn').value);
+        let ringCount = parseInt(document.getElementById('ringCount').value);
+        const warningBox = document.getElementById('warningBox');
+
+        if (isNaN(rOut) || isNaN(targetSpan) || isNaN(rIn) || isNaN(ringCount) || rOut <= 0 || targetSpan <= 0 || rIn < 0 || rIn >= rOut || ringCount < 2) {
+            clearResults();
+            drawError("INVALID PARAMETERS");
+            return;
+        }
+
+        // 1. Theoretical calculations & snapping
+        const theoreticalAngle = (targetSpan * 360) / (2 * Math.PI * rOut);
+        const actualAxesCount = Math.round(360 / theoreticalAngle);
+
+        if(actualAxesCount < 3) {
+            clearResults();
+            drawError("TARGET SPAN TOO LARGE");
+            return;
+        }
+
+        // 2. Exact recalculations
+        const exactAngle = 360 / actualAxesCount;
+        const radialBayDist = (rOut - rIn) / (ringCount - 1);
+
+        // 3. Update UI Text
+        document.getElementById('outAxesCount').innerText = actualAxesCount + " EXACT AXES";
+        document.getElementById('outAngle').innerText = exactAngle.toFixed(2) + "°";
+        document.getElementById('outDist').innerText = radialBayDist.toFixed(3) + " m";
+
+        // Generate dynamic list of spans for all rings
+        let spansHtml = "";
+        for (let i = ringCount - 1; i >= 0; i--) {
+            const currentR = rIn + (i * radialBayDist);
+            if (currentR > 0) {
+                const currentSpan = 2 * Math.PI * currentR * (exactAngle / 360);
+                
+                let ringLabel = `Ring ${i + 1}`;
+                if (i === ringCount - 1) ringLabel = "Outer Perimeter";
+                if (i === 0) ringLabel = "Inner Perimeter";
+                
+                spansHtml += `● ${ringLabel}: <span class="result-value">${currentSpan.toFixed(3)} m</span><br>`;
+            }
+        }
+        document.getElementById('spansList').innerHTML = spansHtml;
+
+        warningBox.style.display = (radialBayDist > 12) ? "block" : "none";
+
+        // 4. Draw Grid, Columns, and Notations
+        drawGrid(rOut, rIn, ringCount, actualAxesCount, exactAngle, radialBayDist);
+    }
+
+    function drawGrid(rOut, rIn, ringCount, axesCount, exactAngleDeg, radialBayDist) {
+        const width = canvas.width;
+        const height = canvas.height;
+        const cx = width / 2;
+        const cy = height / 2;
+        
+        ctx.clearRect(0, 0, width, height);
+
+        // Calculate scale (Padding 100px for outer dimensions)
+        const padding = 100;
+        const scale = (cx - padding) / rOut;
+
+        // --- 1. DRAW RINGS (CIRCULAR AXES) ---
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2;
+        
+        for (let i = 0; i < ringCount; i++) {
+            const currentR = rIn + (i * radialBayDist);
+            if (currentR > 0) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, currentR * scale, 0, 2 * Math.PI);
+                ctx.stroke();
+            }
+        }
+
+        // --- 2. DRAW RADIAL AXES ---
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#d9534f'; 
+        ctx.setLineDash([8, 12]); 
+
+        for (let i = 0; i < axesCount; i++) {
+            const angleRad = (i * exactAngleDeg) * (Math.PI / 180) - (Math.PI / 2);
+            const extension = 30; 
+            const endX = cx + (rOut * scale + extension) * Math.cos(angleRad);
+            const endY = cy + (rOut * scale + extension) * Math.sin(angleRad);
+
+            ctx.beginPath();
+            
+            // FIX: Always start drawing from the absolute center (cx, cy)
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            
+            // Axis Bubble
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#d9534f';
+            ctx.beginPath();
+            ctx.arc(endX, endY, 14, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Axis Label
+            ctx.fillStyle = '#d9534f';
+            ctx.font = 'bold 14px Courier New';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(i + 1, endX, endY);
+            ctx.setLineDash([8, 12]); 
+        }
+        ctx.setLineDash([]);
+
+        // --- 3. DRAW COLUMNS ---
+        ctx.fillStyle = '#444'; // Dark grey columns
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1.5;
+
+        for (let i = 0; i < ringCount; i++) {
+            const currentR = rIn + (i * radialBayDist);
+            if (currentR > 0) {
+                for (let j = 0; j < axesCount; j++) {
+                    const angleRad = (j * exactAngleDeg) * (Math.PI / 180) - (Math.PI / 2);
+                    const colX = cx + (currentR * scale) * Math.cos(angleRad);
+                    const colY = cy + (currentR * scale) * Math.sin(angleRad);
+                    
+                    ctx.beginPath();
+                    ctx.arc(colX, colY, 6, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // --- 4. DRAW DIMENSION NOTATIONS ---
+        drawDimensions(cx, cy, scale, rOut, rIn, ringCount, exactAngleDeg, radialBayDist);
+    }
+
+    function drawDimensions(cx, cy, scale, rOut, rIn, ringCount, exactAngleDeg, radialBayDist) {
+        const dimColor = '#0275d8'; 
+        ctx.strokeStyle = dimColor;
+        ctx.fillStyle = dimColor;
+        ctx.lineWidth = 1.5;
+        ctx.font = 'bold 14px Courier New';
+
+        const a0 = -Math.PI / 2; 
+        const a1 = a0 + (exactAngleDeg * Math.PI / 180);
+        const aMid = (a0 + a1) / 2;
+
+        function drawTick(x, y, angle) {
+            const tickLen = 8;
+            ctx.beginPath();
+            ctx.moveTo(x - Math.cos(angle)*tickLen, y - Math.sin(angle)*tickLen);
+            ctx.lineTo(x + Math.cos(angle)*tickLen, y + Math.sin(angle)*tickLen);
+            ctx.stroke();
+        }
+
+        // SPAN DIMENSIONS FOR ALL RINGS
+        for (let i = 0; i < ringCount; i++) {
+            const currentR = rIn + (i * radialBayDist);
+            if (currentR > 0) {
+                const currentSpan = 2 * Math.PI * currentR * (exactAngleDeg / 360);
+                
+                let isOuter = (i === ringCount - 1);
+                let dimRadius = isOuter ? (currentR * scale) + 45 : (currentR * scale) - 25;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, dimRadius, a0, a1);
+                ctx.stroke();
+                
+                drawTick(cx + Math.cos(a0)*dimRadius, cy + Math.sin(a0)*dimRadius, a0);
+                drawTick(cx + Math.cos(a1)*dimRadius, cy + Math.sin(a1)*dimRadius, a1);
+                
+                ctx.textAlign = 'center';
+                ctx.textBaseline = isOuter ? 'bottom' : 'top';
+                let textOffset = isOuter ? 8 : -8;
+                
+                ctx.fillText(currentSpan.toFixed(2) + "m", cx + Math.cos(aMid)*(dimRadius + textOffset), cy + Math.sin(aMid)*(dimRadius + textOffset));
+            }
+        }
+
+        // FIX: CENTRAL ANGLE DIMENSION (Now locked tightly to the center origin point)
+        const angleRadius = 40; // Fixed small radius independent of rIn
+        ctx.beginPath();
+        ctx.arc(cx, cy, angleRadius, a0, a1);
+        ctx.stroke();
+        
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(exactAngleDeg.toFixed(1) + "°", cx + Math.cos(aMid)*(angleRadius + 15), cy + Math.sin(aMid)*(angleRadius + 15));
+
+        // RADIAL DISTANCE DIMENSION (Measuring only ONE Bay Depth)
+        const offsetDist = 25;
+        const perpAngle = a0 - Math.PI/2; 
+        const offsetX = Math.cos(perpAngle) * offsetDist;
+        const offsetY = Math.sin(perpAngle) * offsetDist;
+
+        const startRadius = rOut - radialBayDist; 
+        const startX = cx + Math.cos(a0)*(startRadius * scale) + offsetX;
+        const startY = cy + Math.sin(a0)*(startRadius * scale) + offsetY;
+        const endX = cx + Math.cos(a0)*(rOut * scale) + offsetX;
+        const endY = cy + Math.sin(a0)*(rOut * scale) + offsetY;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        drawTick(startX, startY, 0); 
+        drawTick(endX, endY, 0);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(radialBayDist.toFixed(2) + "m", startX - 8, (startY + endY)/2);
+    }
+
+    function clearResults() {
+        document.getElementById('outAxesCount').innerText = "--";
+        document.getElementById('outAngle').innerText = "--";
+        document.getElementById('spansList').innerHTML = "";
+        document.getElementById('outDist').innerText = "--";
+    }
+
+    function drawError(msg) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#d9534f";
+        ctx.font = "bold 40px Courier New";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(msg, canvas.width/2, canvas.height/2);
+    }
+
+    // Run on load
+    window.onload = calculateGrid;
+</script>
+
+</body>
+</html>
