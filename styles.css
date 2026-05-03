@@ -128,3 +128,7 @@ ul {
 @keyframes blink {
   50% { opacity: 0; }
 }
+
+.justified-text {
+  text-align: justify;
+}
