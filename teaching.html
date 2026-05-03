@@ -31,11 +31,18 @@
     
 <hr>
 <p>
-  Last updated: March 2026 &nbsp;|&nbsp; 
+  Last updated: <span id="lastUpdated"></span> &nbsp;|&nbsp;
   You are visitor #<span id="counter"></span>
 </p>
 
 <script>
+  // Auto date
+  const months = ["January","February","March","April","May","June",
+                  "July","August","September","October","November","December"];
+  const now = new Date();
+  document.getElementById("lastUpdated").textContent = months[now.getMonth()] + " " + now.getFullYear();
+
+  // Counter
   const base = 4782;
   const random = Math.floor(Math.random() * 200);
   document.getElementById("counter").textContent = (base + random).toLocaleString();
