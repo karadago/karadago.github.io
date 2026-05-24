@@ -439,7 +439,7 @@
             document.getElementById('trussName').innerText = `Pratt Truss - Length: ${spanLong}m, Depth: ${trussDepth}m`;
             drawTruss('trussVis', spanLong, trussDepth);
             
-            primary_Ix_for_col = 50000; 
+            primary_Ix_for_col = Math.pow(spanLong, 2) * 8; 
 
             // --- TEACHING NOTES & WARNINGS ---
             let warningsHTML = "";
