@@ -108,7 +108,7 @@
 <body>
 
 <div class="container">
-    <h2>2025-2026 Spring Semester Grade Calculator (for Structural Analysis)</h2>
+    <h2>2025-2026 Spring Semester Grade Calculator</h2>
 
     <div class="disclaimer">
         <strong>Grading Policy:</strong> Enter your scores (out of 100) below. Note that attendance to the Final Submission and Report is mandatory. <strong>You must score at least a 40 on the Final Submission & Report to pass the course, regardless of your previous grades.</strong>
@@ -143,12 +143,14 @@
         <div class="warning-box" id="mandatoryWarning" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">
             <strong>Note:</strong> The Final Submission is mandatory. Please enter a score to see your final grade.
         </div>
+        <div class="warning-box" id="invalidWarning">
+            <strong>Invalid Input:</strong> Scores cannot exceed 100. Please check your entries.
+        </div>
     </div>
 </div>
 
-<script>
+<script>   
     function calculateGrade() {
-        // Fetch inputs, default to 0 if empty for live calculation of early items
         const midterm = parseFloat(document.getElementById('midterm').value) || 0;
         const assignment = parseFloat(document.getElementById('assignment').value) || 0;
         const midjury = parseFloat(document.getElementById('midjury').value) || 0;
@@ -161,6 +163,19 @@
         const letterGradeElement = document.getElementById('letterGrade');
         const failWarning = document.getElementById('failWarning');
         const mandatoryWarning = document.getElementById('mandatoryWarning');
+        const invalidWarning = document.getElementById('invalidWarning'); // NEW
+
+        failWarning.style.display = 'none';
+        mandatoryWarning.style.display = 'none';
+        invalidWarning.style.display = 'none'; // NEW
+        letterGradeElement.className = 'grade-display';
+
+        if (midterm > 100 || assignment > 100 || midjury > 100 || finalScore > 100) {
+            totalScoreElement.innerText = "--";
+            letterGradeElement.innerText = "--";
+            invalidWarning.style.display = 'block';
+            return; // Stop the calculation
+        }
 
         // Calculate and round the final score mathematically
         const rawTotal = (midterm * 0.20) + (assignment * 0.10) + (midjury * 0.20) + (finalScore * 0.50);
