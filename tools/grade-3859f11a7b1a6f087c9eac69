@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Course Grade Calculator</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .disclaimer {
+            background-color: #e8f4f8;
+            color: #31708f;
+            padding: 15px;
+            border: 1px solid #bce8f1;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            background-color: #fafafa;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+        label {
+            font-weight: bold;
+            flex: 1;
+        }
+        .weight-badge {
+            background-color: #bdc3c7;
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin-left: 10px;
+        }
+        input[type="number"] {
+            width: 100px;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+            text-align: center;
+        }
+        .result-section {
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            background-color: #fff;
+            border: 2px solid #eee;
+            margin-top: 20px;
+        }
+        .score-display {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .grade-display {
+            font-size: 3em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+        .fail-text {
+            color: #d32f2f;
+        }
+        .pass-text {
+            color: #27ae60;
+        }
+        .warning-box {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>2025-2026 Spring Semester Grade Calculator (for Structural Analysis)</h2>
+
+    <div class="disclaimer">
+        <strong>Grading Policy:</strong> Enter your scores (out of 100) below. Note that attendance to the Final Submission and Report is mandatory. <strong>You must score at least a 40 on the Final Submission & Report to pass the course, regardless of your previous grades.</strong>
+    </div>
+
+    <div class="section">
+        <div class="form-group">
+            <label>Midterm Exam <span class="weight-badge">20%</span></label>
+            <input type="number" id="midterm" min="0" max="100" oninput="calculateGrade()" placeholder="0-100">
+        </div>
+        <div class="form-group">
+            <label>Assignment <span class="weight-badge">10%</span></label>
+            <input type="number" id="assignment" min="0" max="100" oninput="calculateGrade()" placeholder="0-100">
+        </div>
+        <div class="form-group">
+            <label>Mid-Jury <span class="weight-badge">20%</span></label>
+            <input type="number" id="midjury" min="0" max="100" oninput="calculateGrade()" placeholder="0-100">
+        </div>
+        <div class="form-group" style="border-top: 1px dashed #ccc; padding-top: 15px; margin-top: 15px;">
+            <label>Final Submission & Report <span class="weight-badge">50%</span></label>
+            <input type="number" id="final" min="0" max="100" oninput="calculateGrade()" placeholder="0-100">
+        </div>
+    </div>
+
+    <div class="result-section" id="resultCard">
+        <div class="score-display">Weighted Grade (rounded): <strong id="totalScore">--</strong> / 100</div>
+        <div class="grade-display" id="letterGrade">--</div>
+        
+        <div class="warning-box" id="failWarning">
+            <strong>Automatic Fail:</strong> Your Final Submission & Report score is below the 40-point minimum threshold.
+        </div>
+        <div class="warning-box" id="mandatoryWarning" style="background-color: #fff3cd; color: #856404; border-color: #ffeeba;">
+            <strong>Note:</strong> The Final Submission is mandatory. Please enter a score to see your final grade.
+        </div>
+    </div>
+</div>
+
+<script>
+    function calculateGrade() {
+        // Fetch inputs, default to 0 if empty for live calculation of early items
+        const midterm = parseFloat(document.getElementById('midterm').value) || 0;
+        const assignment = parseFloat(document.getElementById('assignment').value) || 0;
+        const midjury = parseFloat(document.getElementById('midjury').value) || 0;
+        
+        const finalInput = document.getElementById('final').value;
+        const finalScore = parseFloat(finalInput) || 0;
+        const hasFinal = finalInput.trim() !== "";
+
+        const totalScoreElement = document.getElementById('totalScore');
+        const letterGradeElement = document.getElementById('letterGrade');
+        const failWarning = document.getElementById('failWarning');
+        const mandatoryWarning = document.getElementById('mandatoryWarning');
+
+        // Calculate and round the final score mathematically
+        const rawTotal = (midterm * 0.20) + (assignment * 0.10) + (midjury * 0.20) + (finalScore * 0.50);
+        const roundedTotal = Math.round(rawTotal);
+
+        // Reset UI states
+        failWarning.style.display = 'none';
+        mandatoryWarning.style.display = 'none';
+        letterGradeElement.className = 'grade-display';
+
+        if (!hasFinal) {
+            // If they haven't put in a final score yet, show them their current accumulated points but no letter grade
+            totalScoreElement.innerText = roundedTotal;
+            letterGradeElement.innerText = "?";
+            mandatoryWarning.style.display = 'block';
+            return;
+        }
+
+        // Check Hard Fail Condition
+        if (finalScore < 40) {
+            totalScoreElement.innerText = roundedTotal;
+            letterGradeElement.innerText = "F";
+            letterGradeElement.classList.add('fail-text');
+            failWarning.style.display = 'block';
+            return;
+        }
+
+        // Standard Grade Mapping
+        let grade = "F";
+        
+        if (roundedTotal >= 86) grade = "A";
+        else if (roundedTotal >= 83) grade = "A-";
+        else if (roundedTotal >= 79) grade = "B+";
+        else if (roundedTotal >= 75) grade = "B";
+        else if (roundedTotal >= 71) grade = "B-";
+        else if (roundedTotal >= 66) grade = "C+";
+        else if (roundedTotal >= 61) grade = "C";
+        else if (roundedTotal >= 57) grade = "C-";
+        else if (roundedTotal >= 53) grade = "D+";
+        else if (roundedTotal >= 50) grade = "D";
+
+        // Update UI
+        totalScoreElement.innerText = roundedTotal;
+        letterGradeElement.innerText = grade;
+
+        if (grade === "F") {
+            letterGradeElement.classList.add('fail-text');
+        } else {
+            letterGradeElement.classList.add('pass-text');
+        }
+    }
+</script>
+
+</body>
+</html>
