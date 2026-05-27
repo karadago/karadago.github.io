@@ -16,7 +16,7 @@
             max-width: 750px;
             margin: 0 auto;
             background: #fff;
-            padding: 30px;
+            padding: 30px;            
             border-radius: 8px;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
@@ -72,11 +72,12 @@
             flex: 1;
         }
         input[type="number"] {
-            width: 120px;
+            width: 180px;
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
             font-size: 16px;
+            font-family: inherit;
         }
         .info-text {
             font-size: 0.95em;
@@ -124,16 +125,14 @@
     </style>
 </head>
 <body>
-
 <div class="container">
     <h2>Waffle Slab Calculator</h2>
-
     <img src="https://structurepoint.org/pdfs/Two-Way-Joist-Concrete-Waffle-Slab-Floor-Design-Detailing_files/image002.png" alt="Waffle Slab Diagram" class="hero-image">
-
+    
     <div class="disclaimer">
-        <strong>Disclaimer:</strong> This calculator is only applicable for RC waffle slab systems. Please note that this tool is only for preliminary structural design and not exact. Please use this tool RESPONSIBLY. 
+        <strong>Disclaimer:</strong> This calculator is only applicable for RC waffle slab systems framed with perimeter beams. Please note that this tool is only for preliminary structural design and not exact. Please use this tool RESPONSIBLY. 
     </div>
-
+    
     <div class="fixed-info">
         <span>🔒 Plate Thickness: 10 cm</span>
         <span>🔒 Rib Spacing: 90 cm</span>
@@ -172,13 +171,13 @@
         <h3>Column Properties (Square)</h3>
         <div class="result-group">
             <span class="result-label">Suggested Column Side:</span>
-            <span><span id="columnSide">--</span> cm</span>
+            <span><span id="columnSide" style="font-weight: bold; color: #d32f2f;">--</span> cm</span>
         </div>
-
+        
         <div class="visual-container">
             <h4 style="margin-bottom: 15px;">Cross-Section</h4>
             
-            <svg id="waffleSvg" viewBox="0 0 850 350" xmlns="http://www.w3.org/2000/svg">
+            <svg id="waffleSvg" viewBox="0 0 880 380" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <marker id="arrow-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                         <path d="M 10 0 L 0 5 L 10 10 z" fill="#c0392b" />
@@ -186,8 +185,11 @@
                     <marker id="arrow-end" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto">
                         <path d="M 0 0 L 10 5 L 0 10 z" fill="#c0392b" />
                     </marker>
+                    <marker id="arrow-blue-up" viewBox="0 0 10 10" refX="5" refY="0" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 10 L 5 0 L 10 10 z" fill="#4a90e2" />
+                    </marker>
                 </defs>
-
+                
                 <path d="M 50,80 
                          L 690,80 
                          L 690,200 
@@ -209,35 +211,59 @@
                          L 130,200 
                          L 50,200 Z" 
                       fill="#bdc3c7" stroke="#7f8c8d" stroke-width="2"/>
+                
+                <g id="perimeterBeams">
+                    <text x="90" y="240" fill="#4a90e2" font-size="14px" text-anchor="middle" font-weight="bold">EDGE BEAM</text>
+                    <line x1="90" y1="225" x2="90" y2="205" stroke="#4a90e2" stroke-width="2.5" marker-end="url(#arrow-blue-up)"/>
+                    
+                    <text x="650" y="240" fill="#4a90e2" font-size="14px" text-anchor="middle" font-weight="bold">EDGE BEAM</text>
+                    <line x1="650" y1="225" x2="650" y2="205" stroke="#4a90e2" stroke-width="2.5" marker-end="url(#arrow-blue-up)"/>
+                </g>
 
-                <line x1="710" y1="80" x2="710" y2="110" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
-                <text x="720" y="100" fill="#c0392b" font-size="14px" font-weight="bold">10 cm</text>
-                <line x1="690" y1="80" x2="715" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
-                <line x1="690" y1="110" x2="715" y2="110" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <g id="columns">
+                    <rect x="50" y="200" width="80" height="120" fill="#ecf0f1" stroke="#7f8c8d" stroke-width="2"/>
+                    <rect x="610" y="200" width="80" height="120" fill="#ecf0f1" stroke="#7f8c8d" stroke-width="2"/>
+                    
+                    <line x1="50" y1="340" x2="130" y2="340" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                    <line x1="50" y1="325" x2="50" y2="345" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                    <line x1="130" y1="325" x2="130" y2="345" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                    <text id="svg-col-width-left" x="90" y="360" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
+                    
+                    <line x1="610" y1="340" x2="690" y2="340" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                    <line x1="610" y1="325" x2="610" y2="345" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                    <line x1="690" y1="325" x2="690" y2="345" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                    <text id="svg-col-width-right" x="650" y="360" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
+                </g>
 
-                <line x1="770" y1="80" x2="770" y2="200" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
-                <text id="svg-total-depth" x="780" y="145" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
-                <line x1="690" y1="200" x2="775" y2="200" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
-                <line x1="715" y1="80" x2="775" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
-
+                <line x1="750" y1="80" x2="750" y2="110" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text x="760" y="100" fill="#c0392b" font-size="14px" font-weight="bold">10 cm</text>
+                
+                <line x1="720" y1="80" x2="755" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="720" y1="110" x2="755" y2="110" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                
+                <line x1="810" y1="80" x2="810" y2="200" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
+                <text id="svg-total-depth" x="820" y="145" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
+                
+                <line x1="690" y1="200" x2="815" y2="200" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                <line x1="755" y1="80" x2="815" y2="80" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
+                
                 <line x1="240" y1="50" x2="370" y2="50" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
                 <text x="305" y="40" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">90 cm (Spacing)</text>
                 <line x1="240" y1="55" x2="240" y2="105" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
                 <line x1="370" y1="55" x2="370" y2="105" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
-
+                
                 <line x1="220" y1="230" x2="260" y2="230" stroke="#c0392b" stroke-width="1.5" marker-start="url(#arrow-start)" marker-end="url(#arrow-end)"/>
                 <text id="svg-rib-width" x="240" y="250" text-anchor="middle" fill="#c0392b" font-size="14px" font-weight="bold">-- cm</text>
                 <line x1="220" y1="205" x2="220" y2="235" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
                 <line x1="260" y1="205" x2="260" y2="235" stroke="#95a5a6" stroke-width="1" stroke-dasharray="4,4"/>
             </svg>
         </div>
-
+        
         <div class="promo-box" style="margin-top: 30px; padding: 20px; background-color: #e8f4f8; border: 1px solid #bce8f1; border-radius: 8px; text-align: center;">
             <h4 style="margin-top: 0; color: #31708f;">Visualize Your Design in 3D</h4>
             <p style="color: #31708f; font-size: 0.95em; margin-bottom: 15px;">Want to see how these dimensions look in a real spatial environment? Use our Interactive 3D Structural Design Tool to visualize your waffle slab and columns.</p>
             <a href="https://omerkaradag.tr/tools/vis-1106b1450afd0832ece8566b.html" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #3498db; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; transition: background-color 0.3s;">Launch 3D Visualizer</a>
-        </div>
-        
+        </div>    
     </div>
 </div>
 
@@ -246,46 +272,44 @@
         const spanLength = parseFloat(document.getElementById('spanLength').value);
         const storyHeightInput = document.getElementById('storyHeight');
         const storyHeight = parseFloat(storyHeightInput.value);
-        const spanError = document.getElementById('spanError');
         
+        const spanError = document.getElementById('spanError');
         const storyHeightGroup = document.getElementById('storyHeightGroup');
         const depthSection = document.getElementById('depthSection');
         const ribSection = document.getElementById('ribSection');
         const resultsSection = document.getElementById('resultsSection');
 
-// 1. Span Validation Check
+        // 1. Span Validation Check
         if (!isNaN(spanLength) && spanLength > 0) {
             if (spanLength <= 900) {
                 spanError.innerHTML = "Error: Span lengths of this scale are an overkill for waffle slabs. A standard slab with beams is recommended. You can use <a href='https://omerkaradag.tr/tools/calc-2302c4f0aad8bc347931ee6c.html' target='_blank'>this calculator</a> instead.";
                 spanError.style.display = 'block';
                 
-                // Hide subsequent sections if invalid
                 storyHeightGroup.style.display = 'none';
                 depthSection.style.display = 'none';
                 ribSection.style.display = 'none';
                 resultsSection.style.display = 'none';
-                return; // Stop calculation
+                return; 
             } else if (spanLength > 1501) {
                 spanError.innerHTML = "Error: For spans that great, prestressed concrete is a better alternative.";
                 spanError.style.display = 'block';
                 
-                // Hide subsequent sections if invalid
                 storyHeightGroup.style.display = 'none';
                 depthSection.style.display = 'none';
                 ribSection.style.display = 'none';
                 resultsSection.style.display = 'none';
-                return; // Stop calculation
+                return; 
             } else {
                 spanError.style.display = 'none';
                 storyHeightGroup.style.display = 'flex';
                 depthSection.style.display = 'block';
             }
 
-            // 2. Suggest Depth
+            // 2. Suggest Depth (L/24)
             const suggestedDepth = (spanLength / 24).toFixed(2);
             document.getElementById('suggestedDepthText').innerText = `Suggested total depth: ${suggestedDepth} cm`;
-        } else {
 
+        } else {
             spanError.style.display = 'none';
             storyHeightGroup.style.display = 'none';
             depthSection.style.display = 'none';
@@ -296,7 +320,7 @@
 
         // 3. Rib Width Calculation
         const userDepth = parseFloat(document.getElementById('userDepth').value);
-        if (!isNaN(userDepth) && userDepth > 10) { // Depth must be greater than 10cm plate
+        if (!isNaN(userDepth) && userDepth > 10) { 
             ribSection.style.display = 'block';
             const suggestedRib = ((userDepth - 10) / 2).toFixed(2);
             document.getElementById('suggestedRibText').innerText = `Suggested rib width: ${suggestedRib} cm`;
@@ -308,29 +332,30 @@
 
         // 4. Final Calculations & Visuals
         const userRibWidth = parseFloat(document.getElementById('userRibWidth').value);
-
+        
         if (!isNaN(storyHeight) && storyHeight > 0 && !isNaN(userRibWidth) && userRibWidth > 0) {
             resultsSection.style.display = 'block';
 
-            // Column Calculation Formula provided: 
-            // =(12*1.2*(story height/span length)*(((span length/20)*(span length/10)^3))/12)^(1/4)
+            // Moment Distribution Factor automatically applied for framed edge conditions
+            const momentFactor = 0.40; 
+
             const part1 = 12 * 1.2 * (storyHeight / spanLength);
             const part2 = (spanLength / 20) * Math.pow((spanLength / 10), 3);
-            const exactSide = Math.pow((part1 * (part2 / 12)), 0.25);
             
-            // Rounding up to the nearest 5 just like the previous calculator logic
+            const exactSide = Math.pow((part1 * (part2 / 12) * momentFactor), 0.25);
+            
             const sideColumn = Math.ceil(exactSide / 5) * 5; 
             document.getElementById('columnSide').innerText = sideColumn;
 
             // Update SVG Labels
             document.getElementById('svg-total-depth').textContent = userDepth + " cm";
             document.getElementById('svg-rib-width').textContent = userRibWidth + " cm";
-
+            document.getElementById('svg-col-width-left').textContent = sideColumn + " cm";
+            document.getElementById('svg-col-width-right').textContent = sideColumn + " cm";
         } else {
             resultsSection.style.display = 'none';
         }
     }
 </script>
-
 </body>
 </html>
