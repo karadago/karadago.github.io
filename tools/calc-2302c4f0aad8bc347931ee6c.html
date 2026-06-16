@@ -44,7 +44,7 @@
             border-radius: 5px;
             margin-top: 10px;
             font-size: 0.9em;
-            display: none; /* Hidden by default */
+            display: none;
         }
         .section {
             margin-bottom: 20px;
@@ -88,7 +88,7 @@
         .result-group {
             display: flex;
             justify-content: flex-start;
-            gap: 15px; 
+            gap: 15px;
             padding: 8px 0;
             border-bottom: 1px dashed #ccc;
         }
@@ -104,7 +104,7 @@
         }
         .visual-container {
             display: flex;
-            justify-content: center; /* Centers the two boxes */
+            justify-content: center;
             gap: 50px;
             align-items: center;
             margin-top: 20px;
@@ -116,6 +116,17 @@
         }
         .svg-container {
             margin: 0 auto;
+        }
+        .radio-group {
+            display: flex;
+            gap: 20px;
+        }
+        .radio-group label {
+            font-weight: normal;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -159,7 +170,7 @@
             <label>Determined Beam Depth [cm]:</label>
             <input type="number" id="beamDepth" oninput="calculateAll()">
         </div>
-        
+
         <span class="info-text text-red" id="suggestedBeamWidthText">Suggested beam width (Depth / 2): -- cm</span>
         <div class="form-group">
             <label>Determined Beam Width [cm]:</label>
@@ -167,7 +178,38 @@
         </div>
     </div>
 
+    <div class="section">
+        <div class="form-group">
+            <label>Column Cross-Section:</label>
+            <div class="radio-group">
+                <label>
+                    <input type="radio" name="colType" value="square" checked onchange="calculateAll()">
+                    Square
+                </label>
+                <label>
+                    <input type="radio" name="colType" value="rectangular" onchange="calculateAll()">
+                    Rectangular
+                </label>
+            </div>
+        </div>
+
+        <div id="rectInputGroup" style="display: none;">
+            <div class="form-group">
+                <label>Column Side A [cm]:</label>
+                <input type="number" id="colSideA" oninput="calculateAll()">
+            </div>
+            <span class="info-text text-red" id="calcColSideBText">
+                Calculated Column Side B: -- cm
+            </span>
+        </div>
+    </div>
+
     <div class="section" id="resultsSection" style="display: none;">
+        
+        <div class="warning-box" id="scwbWarning" style="margin-bottom: 20px;">
+            <strong>SCWB CRITERION CONTROLS:</strong> The column size was actively increased to prevent a strong beam-weak column irregularity. The dimensions shown ensure ductile seismic behavior based on section modulus.
+        </div>
+
         <h3>Beam Properties</h3>
         <div class="result-group">
             <span class="result-label">Moment of Inertia (I<sub>x_beam</sub>):</span>
@@ -178,14 +220,14 @@
             <span><span id="beamArea">--</span> cm<sup>2</sup></span>
         </div>
 
-        <h3 style="margin-top: 20px;">Column Properties (Square)</h3>
+        <h3 style="margin-top: 20px;" id="colPropsHeading">Column Properties (Square)</h3>
         <div class="result-group">
             <span class="result-label">Moment of Inertia (I<sub>column</sub>):</span>
             <span><span id="columnInertia">--</span> cm<sup>4</sup></span>
         </div>
         <div class="result-group">
-            <span class="result-label">Column Side:</span>
-            <span><span id="columnSide">--</span> cm</span>
+            <span class="result-label" id="colDimsLabel">Column Dimensions:</span>
+            <span id="columnDimsDisplay">-- cm</span>
         </div>
         <div class="result-group">
             <span class="result-label">Column Area:</span>
@@ -208,22 +250,20 @@
             <p style="color: #31708f; font-size: 0.95em; margin-bottom: 15px;">Want to see how these dimensions look in a real spatial environment? Use our Interactive 3D Structural Design Tool to visualize your slabs, beams and columns.</p>
             <a href="https://omerkaradag.tr/tools/vis-1106b1450afd0832ece8566b.html" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #3498db; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold; transition: background-color 0.3s;">Launch 3D Visualizer</a>
         </div>
-        
     </div>
 </div>
 
 <script>
     function drawDimensions(containerId, w, h) {
         const container = document.getElementById(containerId);
-        container.innerHTML = ''; // Clear previous drawing
+        container.innerHTML = '';
 
         const svgNS = "http://www.w3.org/2000/svg";
-        const svgSize = 220; // Fixed canvas size
+        const svgSize = 220;
         const svg = document.createElementNS(svgNS, "svg");
         svg.setAttribute("width", svgSize);
         svg.setAttribute("height", svgSize);
 
-        // Define arrowhead markers
         const defs = document.createElementNS(svgNS, "defs");
         defs.innerHTML = `
             <marker id="arrow-start" viewBox="0 0 10 10" refX="0" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
@@ -235,19 +275,16 @@
         `;
         svg.appendChild(defs);
 
-        // Scale geometry to leave room for dimension text
-        const padding = 60; 
+        const padding = 60;
         const maxDim = Math.max(w, h);
         const scale = (svgSize - padding * 1.5) / maxDim;
-        
+
         const drawW = w * scale;
         const drawH = h * scale;
-        
-        // Center the rectangle but shift left/up slightly to balance the right/bottom dimensions
+
         const startX = (svgSize - drawW) / 2 - 20;
         const startY = (svgSize - drawH) / 2 - 20;
 
-        // Draw Rect
         const rect = document.createElementNS(svgNS, "rect");
         rect.setAttribute("x", startX);
         rect.setAttribute("y", startY);
@@ -258,7 +295,6 @@
         rect.setAttribute("stroke-width", "2");
         svg.appendChild(rect);
 
-        // Draw Width Dimension (Bottom)
         const dimY = startY + drawH + 25;
         const lineW = document.createElementNS(svgNS, "line");
         lineW.setAttribute("x1", startX);
@@ -281,7 +317,6 @@
         textW.textContent = w + " cm";
         svg.appendChild(textW);
 
-        // Draw Height Dimension (Right)
         const dimX = startX + drawW + 25;
         const lineH = document.createElementNS(svgNS, "line");
         lineH.setAttribute("x1", dimX);
@@ -308,89 +343,144 @@
 
     function calculateAll() {
         const storyHeight = parseFloat(document.getElementById('storyHeight').value);
-        const spanLength = parseFloat(document.getElementById('spanLength').value);
-        const spanError = document.getElementById('spanError');
+        const spanLength  = parseFloat(document.getElementById('spanLength').value);
+        const spanError           = document.getElementById('spanError');
         const proportionalWarning = document.getElementById('proportionalWarning');
-        const resultsSection = document.getElementById('resultsSection');
-        
-        // 1. Proportionality Warning
+        const resultsSection      = document.getElementById('resultsSection');
+        const scwbWarning         = document.getElementById('scwbWarning');
+
         if (!isNaN(spanLength) && !isNaN(storyHeight) && spanLength > 0 && storyHeight > 0) {
-            if (spanLength < 1.5 * storyHeight) {
-                proportionalWarning.style.display = 'block';
-            } else {
-                proportionalWarning.style.display = 'none';
-            }
+            proportionalWarning.style.display = (spanLength < 1.5 * storyHeight) ? 'block' : 'none';
         } else {
             proportionalWarning.style.display = 'none';
         }
 
-        // 2. Span Validation Constraint (920cm limit)
         if (spanLength >= 920) {
             spanError.innerHTML = "Error: Span lengths at this scale can be better with a waffle slab. You can use <a href='https://omerkaradag.tr/tools/waff-661c61e3481ed7f3d4d41a0e.html' target='_blank'>this calculator</a> instead.";
             resultsSection.style.display = 'none';
-            return; 
+            return;
         } else {
             spanError.innerText = "";
         }
 
-        // 3. Slab approximation
         if (!isNaN(spanLength) && spanLength > 0) {
-            const approxSlab = (spanLength / 30).toFixed(2);
-            document.getElementById('approxSlabText').innerText = `Approximate slab thickness (L/30): ${approxSlab} cm`;
+            document.getElementById('approxSlabText').innerText =
+                `Approximate slab thickness (L/30): ${(spanLength / 30).toFixed(2)} cm`;
         } else {
-            document.getElementById('approxSlabText').innerText = `Approximate slab thickness (L/30): -- cm`;
+            document.getElementById('approxSlabText').innerText = 'Approximate slab thickness (L/30): -- cm';
         }
 
-        // 4. Beam depth approximation
         const slabThickness = parseFloat(document.getElementById('slabThickness').value);
         if (!isNaN(slabThickness) && slabThickness > 0) {
-            const approxBeamDepth = (3 * slabThickness).toFixed(2);
-            document.getElementById('approxBeamDepthText').innerText = `Approximate beam depth (3 x slab thickness): ${approxBeamDepth} cm`;
+            document.getElementById('approxBeamDepthText').innerText =
+                `Approximate beam depth (3 x slab thickness): ${(3 * slabThickness).toFixed(2)} cm`;
         } else {
-            document.getElementById('approxBeamDepthText').innerText = `Approximate beam depth (3 x slab thickness): -- cm`;
+            document.getElementById('approxBeamDepthText').innerText = 'Approximate beam depth (3 x slab thickness): -- cm';
         }
 
-        // 5. Beam width suggestion
         const beamDepth = parseFloat(document.getElementById('beamDepth').value);
         if (!isNaN(beamDepth) && beamDepth > 0) {
-            const suggestedBeamWidth = (beamDepth / 2).toFixed(2);
-            document.getElementById('suggestedBeamWidthText').innerText = `Suggested beam width (Depth / 2): ${suggestedBeamWidth} cm`;
+            document.getElementById('suggestedBeamWidthText').innerText =
+                `Suggested beam width (Depth / 2): ${(beamDepth / 2).toFixed(2)} cm`;
         } else {
-            document.getElementById('suggestedBeamWidthText').innerText = `Suggested beam width (Depth / 2): -- cm`;
+            document.getElementById('suggestedBeamWidthText').innerText = 'Suggested beam width (Depth / 2): -- cm';
         }
 
-        // 6. Final Calculations & Visuals
+        const colType       = document.querySelector('input[name="colType"]:checked').value;
+        const rectInputGroup = document.getElementById('rectInputGroup');
+        rectInputGroup.style.display = (colType === 'rectangular') ? 'block' : 'none';
+
         const beamWidth = parseFloat(document.getElementById('beamWidth').value);
 
         if (!isNaN(storyHeight) && !isNaN(spanLength) && !isNaN(beamDepth) && !isNaN(beamWidth)) {
-            resultsSection.style.display = 'block';
 
-            const Ix_beam = (beamWidth * Math.pow(beamDepth, 3)) / 12;
+            // Calculate Beam Properties
+            const Ix_beam  = (beamWidth * Math.pow(beamDepth, 3)) / 12;
+            const S_beam   = (beamWidth * Math.pow(beamDepth, 2)) / 6;
             const areaBeam = beamWidth * beamDepth;
-            const I_column = 1.2 * Ix_beam * (storyHeight / spanLength);
             
-            const exactSide = Math.sqrt(Math.sqrt(I_column * 12));
-            const sideColumn = Math.ceil(exactSide / 5) * 5; 
-            const areaColumn = Math.pow(sideColumn, 2);
+            // Required properties for Column
+            const I_column_req = 1.2 * Ix_beam * (storyHeight / spanLength);
+            const S_column_req = 1.2 * S_beam;
 
-            document.getElementById('beamInertia').innerText = Ix_beam.toFixed(2);
-            document.getElementById('beamArea').innerText = areaBeam.toFixed(2);
-            document.getElementById('columnInertia').innerText = I_column.toFixed(2);
-            document.getElementById('columnSide').innerText = sideColumn;
-            
-            const areaColElement = document.getElementById('columnArea');
-            areaColElement.innerText = areaColumn;
+            let sideA, sideB, areaColumn;
+            let scwbControls = false;
 
-            if (areaColumn > areaBeam) {
-                areaColElement.className = "highlight-green";
+            if (colType === 'rectangular') {
+                const colSideAInput   = parseFloat(document.getElementById('colSideA').value);
+                const calcColSideBText = document.getElementById('calcColSideBText');
+
+                if (!isNaN(colSideAInput) && colSideAInput > 0) {
+                    // Check both Stiffness and SCWB criteria
+                    const exactSideB_stiff = Math.cbrt(12 * I_column_req / colSideAInput);
+                    const exactSideB_scwb  = Math.sqrt(6 * S_column_req / colSideAInput);
+                    
+                    if (exactSideB_scwb > exactSideB_stiff) {
+                        scwbControls = true;
+                    }
+
+                    // Maximum governs
+                    const exactSideB = Math.max(exactSideB_stiff, exactSideB_scwb);
+
+                    sideA      = colSideAInput;
+                    sideB      = Math.ceil(exactSideB / 5) * 5;
+                    if (sideB > 2 * sideA || sideA > 2 * sideB) {
+                        calcColSideBText.innerHTML = `<strong>Error:</strong> Structural requirements demand ${sideA} &times; ${sideB} cm, which violates the 1:2 ratio limit. Adjust Side A.`;
+                        resultsSection.style.display = 'none';
+                        return;
+                    }
+                    areaColumn = sideA * sideB;
+                    calcColSideBText.innerText = `Calculated Column Side B: ${sideB} cm`;
+                } else {
+                    document.getElementById('calcColSideBText').innerText =
+                        'Calculated Column Side B: -- cm';
+                    resultsSection.style.display = 'none';
+                    return;
+                }
             } else {
-                areaColElement.className = "";
+                // Check both Stiffness and SCWB criteria for Square Column
+                const exactSide_stiff = Math.pow(I_column_req * 12, 0.25);
+                const exactSide_scwb  = Math.cbrt(S_column_req * 6);
+                
+                if (exactSide_scwb > exactSide_stiff) {
+                    scwbControls = true;
+                }
+
+                // Maximum governs
+                const exactSide = Math.max(exactSide_stiff, exactSide_scwb);
+                
+                sideA      = Math.ceil(exactSide / 5) * 5;
+                sideB      = sideA;
+                areaColumn = Math.pow(sideA, 2);
             }
 
-            // Draw the SVG dimensions
+            // Recalculate actual delivered I_column based on finalized dimensions
+            const actual_I_column = (sideA * Math.pow(sideB, 3)) / 12;
+
+            resultsSection.style.display = 'block';
+            scwbWarning.style.display = scwbControls ? 'block' : 'none';
+
+            document.getElementById('beamInertia').innerText = Ix_beam.toFixed(2);
+            document.getElementById('beamArea').innerText    = areaBeam.toFixed(2);
+            document.getElementById('columnInertia').innerText = actual_I_column.toFixed(2);
+
+            document.getElementById('colPropsHeading').innerText =
+                colType === 'rectangular'
+                    ? 'Column Properties (Rectangular)'
+                    : 'Column Properties (Square)';
+
+            document.getElementById('columnDimsDisplay').innerHTML =
+                colType === 'rectangular'
+                    ? `${sideA} &times; ${sideB} cm`
+                    : `${sideA} cm`;
+
+            const areaColElement = document.getElementById('columnArea');
+            areaColElement.innerText  = areaColumn;
+            areaColElement.className  = (areaColumn > areaBeam) ? 'highlight-green' : '';
+
             drawDimensions('beamVis', beamWidth, beamDepth);
-            drawDimensions('colVis', sideColumn, sideColumn);
-            
+            drawDimensions('colVis',  sideA, sideB);
+
         } else {
             resultsSection.style.display = 'none';
         }
