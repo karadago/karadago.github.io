@@ -450,7 +450,7 @@ const backStencilMat = new THREE.MeshBasicMaterial({
                 if (params.rcColumnShape === 'Circular') {
                     const diameter = safeSize;
                     const radius = diameter / 2;
-                colGeo = new THREE.CylinderGeometry(radius, radius, safeHeight, 32);
+                    colGeo = new THREE.CylinderGeometry(radius, radius, safeHeight, 32);
                 } else {
                 colGeo = new THREE.BoxGeometry(safeSize, safeHeight, safeSize);
             }
