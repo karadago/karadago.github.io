@@ -100,7 +100,7 @@
                     spanX: 10.0,
                     spanY: 6.0,
                     columnSize: 0.5,
-                    
+                    rcColumnShape: 'Square',
                     structuralMaterial: 'Reinforced Concrete',
                     steelColumnType: 'HEB Section',
                     steelSystem: 'Primary/Secondary Beams',
@@ -431,7 +431,6 @@ const backStencilMat = new THREE.MeshBasicMaterial({
             buildingGroup.add(raft);
 
             // 2. COLUMNS & BASEMENT WALLS
-// 2. COLUMNS & BASEMENT WALLS
             let colGeo;
             let colMat = getMat('column');
             
@@ -448,6 +447,11 @@ const backStencilMat = new THREE.MeshBasicMaterial({
                     colGeo = createHollowSquare(safeSize, safeHeight, true);
                 }
             } else {
+                if (params.rcColumnShape === 'Circular') {
+                    const diameter = safeSize;
+                    const radius = diameter / 2;
+                colGeo = new THREE.CylinderGeometry(radius, radius, safeHeight, 32);
+                } else {
                 colGeo = new THREE.BoxGeometry(safeSize, safeHeight, safeSize);
             }
             
@@ -948,6 +952,7 @@ const backStencilMat = new THREE.MeshBasicMaterial({
         folderGeneral.add(params, 'spanX', 3, 20, 0.5).name('X Span Length (m)').onChange(generateBuilding);
         folderGeneral.add(params, 'spanY', 3, 20, 0.5).name('Y Span Length (m)').onChange(generateBuilding);
         folderGeneral.add(params, 'columnSize', 0.2, 1.5, 0.05).name('Column Size (m)').onChange(generateBuilding);
+        folderGeneral.add(params, 'rcColumnShape', ['Square', 'Circular']).name('RC Column Shape').onChange(generateBuilding);
 
         const folderSlab = gui.addFolder('Slab System');
         let slabTypeCtrl = folderSlab.add(params, 'slabType', [
