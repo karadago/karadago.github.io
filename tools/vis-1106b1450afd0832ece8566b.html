@@ -454,6 +454,7 @@ const backStencilMat = new THREE.MeshBasicMaterial({
                 } else {
                 colGeo = new THREE.BoxGeometry(safeSize, safeHeight, safeSize);
             }
+            }
             
             for (let s = -params.basementCount; s < params.storyCount; s++) {
                 const yPos = (s * params.storyHeight) + (params.storyHeight / 2);
