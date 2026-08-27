@@ -144,24 +144,30 @@ ul {
 .photo-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 15px;
+    gap: 10px;
     margin: 15px 0;
 }
 
 .photo-row figure {
-    flex: 1 1 220px;
+    width: 140px;
     margin: 0;
 }
 
 .photo-row img {
     display: block;
-    width: 100%;
-    height: auto;
+    width: 140px;
+    height: 100px;
+    object-fit: cover;
     border: 1px solid #000;
 }
 
-.photo-row figcaption {
-    margin-top: 5px;
-    font-size: 0.9em;
-    text-align: center;
+.photo-row a:hover img {
+    opacity: 0.75;
 }
+
+.photo-row figcaption {
+    margin-top: 4px;
+    font-size: 0.8em;
+    line-height: 1.2;
+}
+
