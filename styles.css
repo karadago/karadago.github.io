@@ -140,3 +140,28 @@ ul {
     text-align: left;
   }
 }
+
+.photo-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin: 15px 0;
+}
+
+.photo-row figure {
+    flex: 1 1 220px;
+    margin: 0;
+}
+
+.photo-row img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid #000;
+}
+
+.photo-row figcaption {
+    margin-top: 5px;
+    font-size: 0.9em;
+    text-align: center;
+}
