@@ -140,18 +140,23 @@ ul {
     text-align: left;
   }
 }
+
 .photo-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    max-width: 360px;
+    display: flex !important;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+}
+
+.photo-row a {
+    display: block;
+    width: 50%;
 }
 
 .photo-row img {
     display: block;
     width: 100%;
-    height: auto;
-    aspect-ratio: 4 / 3;
+    height: 90px;
     object-fit: cover;
     border: 1px solid #000;
 }
