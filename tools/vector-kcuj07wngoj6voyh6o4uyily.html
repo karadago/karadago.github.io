@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Statics Force-Vector Editor</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #ef4444;
+      --resultant: #7c3aed;
+      --resultant-bg: #faf5ff;
+      --resultant-border: #c4b5fd;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      cursor: default;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Top Floating Viewport Toolbar */
+    .viewport-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      font-size: 13px;
+      color: var(--text-muted);
+      align-items: center;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .viewport-overlay button {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 12px;
+    }
+
+    .viewport-overlay button:hover {
+      background: #e2e8f0;
+    }
+
+    .scale-slider {
+      width: 80px;
+      cursor: pointer;
+      accent-color: var(--primary);
+    }
+
+    /* Sidebar */
+    #sidebar {
+      width: 420px;
+      min-width: 380px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.03);
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h1 {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .unit-select {
+      font-size: 12px;
+      background: #e0f2fe;
+      color: #0284c7;
+      border: 1px solid #bae6fd;
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .control-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toggle-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+    .btn-secondary:hover {
+      background: #cbd5e1;
+    }
+
+    /* Resultant Inspector Box */
+    .result-panel {
+      background: var(--resultant-bg);
+      border: 1px solid var(--resultant-border);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .result-panel.disabled {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+      opacity: 0.75;
+    }
+
+    .result-panel h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--resultant);
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .result-placeholder {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-style: italic;
+      padding: 6px 0;
+    }
+
+    .math-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-top: 4px;
+    }
+
+    .math-table td {
+      padding: 4px 0;
+    }
+
+    .math-table td:nth-child(1) {
+      color: var(--text-muted);
+      width: 50%;
+    }
+
+    .math-table td:nth-child(2) {
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* Force Items */
+    .forces-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .force-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #ccc;
+      border-radius: 6px;
+      padding: 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .force-card.active {
+      border-color: #94a3b8;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    }
+
+    .force-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .force-title {
+      font-size: 14px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .force-delete {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .force-delete:hover {
+      color: var(--danger);
+      background: #fee2e2;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .form-group.full {
+      grid-column: span 2;
+    }
+
+    label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      background: #f8fafc;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus, select:focus {
+      border-color: var(--primary);
+      background: #ffffff;
+    }
+
+    .empty-state {
+      padding: 28px 16px;
+      text-align: center;
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Workspace Canvas -->
+  <div id="canvas-container">
+    <div class="viewport-overlay">
+      <div class="toolbar-group">
+        <button id="btn-recenter">Recenter</button>
+        <button id="btn-zoom-out" title="Zoom Out">−</button>
+        <span id="label-zoom-pct" style="font-weight: 600; min-width: 44px; text-align: center;">100%</span>
+        <button id="btn-zoom-in" title="Zoom In">+</button>
+      </div>
+
+      <div class="toolbar-group" style="border-left: 1px solid #cbd5e1; padding-left: 10px;">
+        <span>Scale:</span>
+        <input type="range" id="slider-vector-scale" class="scale-slider" min="0.5" max="2.5" step="0.1" value="1.0" title="Multiplier for force vector visual length">
+        <span id="label-scale-val" style="font-weight: 600; min-width: 28px;">1.0×</span>
+      </div>
+
+      <div class="toolbar-group" style="border-left: 1px solid #cbd5e1; padding-left: 10px;">
+        <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+          <input type="checkbox" id="chk-snap" checked>
+          <span>Snap Grid</span>
+        </label>
+      </div>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <!-- Sidebar Control Panel -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Statics Vector Editor</h1>
+      <select id="global-unit" class="unit-select">
+        <option value="kN">Unit: kN</option>
+        <option value="N">Unit: N</option>
+      </select>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- Display Toggles -->
+      <div class="control-box">
+        <span class="section-title">Display Options</span>
+        <label class="toggle-label">
+          <input type="checkbox" id="chk-resultant">
+          <span>Show Resultant Force (<strong style="color:var(--resultant);">R</strong>)</span>
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="chk-components">
+          <span>Show Rectangular Components (<strong>F<sub>x</sub>, F<sub>y</sub></strong>)</span>
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="chk-angles" checked>
+          <span>Show Angle Arcs from +x axis</span>
+        </label>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="btn-row">
+        <button class="btn btn-primary" id="btn-add-force">+ Add Force</button>
+        <button class="btn btn-secondary" id="btn-example">Load Example</button>
+        <button class="btn btn-secondary" id="btn-clear">Clear</button>
+      </div>
+
+      <!-- Resultant Solution Inspector -->
+      <div class="result-panel disabled" id="result-box">
+        <h3>
+          <span>Resultant Vector (R)</span>
+          <span id="res-badge" style="font-size:11px; text-transform:none; color:#64748b;">Hidden</span>
+        </h3>
+        
+        <div id="result-hidden-msg" class="result-placeholder">
+          Enable <strong>"Show Resultant Force"</strong> above to inspect &Sigma;F<sub>x</sub>, &Sigma;F<sub>y</sub>, and R.
+        </div>
+
+        <div id="result-data-box" style="display: none;">
+          <table class="math-table">
+            <tr>
+              <td>&Sigma; F<sub>x</sub> (Horizontal):</td>
+              <td id="val-sum-fx">0.00 kN</td>
+            </tr>
+            <tr>
+              <td>&Sigma; F<sub>y</sub> (Vertical):</td>
+              <td id="val-sum-fy">0.00 kN</td>
+            </tr>
+            <tr>
+              <td>Magnitude |R|:</td>
+              <td id="val-res-mag" style="color:var(--resultant);">0.00 kN</td>
+            </tr>
+            <tr>
+              <td>Direction (&theta; from +x):</td>
+              <td id="val-res-theta">0.0&deg;</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- Forces List Container -->
+      <div class="section-title" style="margin-top: 4px;">Applied Forces (<span id="forces-count">0</span>)</div>
+      <div class="forces-list" id="forces-container"></div>
+    </div>
+  </div>
+
+  <script>
+    const FORCE_PALETTE = [
+      "#dc2626", // Red
+      "#0284c7", // Deep Sky Blue
+      "#059669", // Forest Green
+      "#ea580c", // Vibrant Orange
+      "#0891b2", // Teal
+      "#92400e"  // Warm Bronze
+    ];
+
+    const RESULTANT_COLOR = "#7c3aed";
+    const BASE_ZOOM = 40; // Reference 100% zoom (40px per grid block)
+
+    let state = {
+      forces: [],
+      unit: "kN",
+      selectedForceId: null,
+      dragMode: null, // 'appPoint', 'outerTip', or 'pan'
+      activeDragIndex: -1,
+      hoveredHandle: null,
+      vectorScaleMultiplier: 1.0,
+      view: {
+        panX: 0,
+        panY: 0,
+        zoom: 40,
+        gridSize: 1
+      },
+      dragStart: { x: 0, y: 0 },
+      options: {
+        showResultant: false,
+        showComponents: false,
+        showAngles: true,
+        snapToGrid: true
+      }
+    };
+
+    let nextForceId = 1;
+
+    // DOM Elements
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
+    const forcesContainer = document.getElementById("forces-container");
+    const forcesCountEl = document.getElementById("forces-count");
+    const globalUnitSelect = document.getElementById("global-unit");
+
+    const sliderVectorScale = document.getElementById("slider-vector-scale");
+    const labelScaleVal = document.getElementById("label-scale-val");
+    const labelZoomPct = document.getElementById("label-zoom-pct");
+
+    const resultBox = document.getElementById("result-box");
+    const resultBadge = document.getElementById("res-badge");
+    const resultHiddenMsg = document.getElementById("result-hidden-msg");
+    const resultDataBox = document.getElementById("result-data-box");
+    const valSumFx = document.getElementById("val-sum-fx");
+    const valSumFy = document.getElementById("val-sum-fy");
+    const valResMag = document.getElementById("val-res-mag");
+    const valResTheta = document.getElementById("val-res-theta");
+
+    const chkResultant = document.getElementById("chk-resultant");
+    const chkComponents = document.getElementById("chk-components");
+    const chkAngles = document.getElementById("chk-angles");
+    const chkSnap = document.getElementById("chk-snap");
+
+    function degToRad(deg) { return (deg * Math.PI) / 180; }
+    function radToDeg(rad) { return (rad * 180) / Math.PI; }
+
+    function snap(val, step = 0.5) {
+      return state.options.snapToGrid ? Math.round(val / step) * step : val;
+    }
+
+    function createForce(appX = 0, appY = 0, mag = 50, angle = 45, sense = "pulling") {
+      const color = FORCE_PALETTE[(nextForceId - 1) % FORCE_PALETTE.length];
+      return {
+        id: nextForceId++,
+        name: `F${state.forces.length + 1}`,
+        color: color,
+        appX: appX,
+        appY: appY,
+        magnitude: mag,
+        angle: (angle % 360 + 360) % 360,
+        sense: sense // 'pulling' (away) or 'pushing' (toward P)
+      };
+    }
+
+    // Physical Force Scale (Pixels per Unit) tied to ZOOM
+    function getPxPerUnit() {
+      // At zoom 40, a 50 kN force visual length = 50 * (40/15) * 1.0 = ~133 px
+      return (state.view.zoom / 15) * state.vectorScaleMultiplier;
+    }
+
+    function getComponents(force) {
+      const rad = degToRad(force.angle);
+      const sign = (force.sense === "pushing") ? -1 : 1;
+      const fx = sign * force.magnitude * Math.cos(rad);
+      const fy = sign * force.magnitude * Math.sin(rad);
+      return { fx, fy, rad };
+    }
+
+    function worldToScreen(wx, wy) {
+      const rect = container.getBoundingClientRect();
+      const cx = rect.width / 2 + state.view.panX;
+      const cy = rect.height / 2 + state.view.panY;
+      return {
+        x: cx + wx * state.view.zoom,
+        y: cy - wy * state.view.zoom
+      };
+    }
+
+    function screenToWorld(sx, sy) {
+      const rect = container.getBoundingClientRect();
+      const cx = rect.width / 2 + state.view.panX;
+      const cy = rect.height / 2 + state.view.panY;
+      return {
+        x: (sx - cx) / state.view.zoom,
+        y: -(sy - cy) / state.view.zoom
+      };
+    }
+
+    function resize() {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render();
+    }
+
+    // High-Readability Rounded Label Badge
+    function drawTextBadge(text, x, y, options = {}) {
+      ctx.save();
+      const font = options.font || "bold 12px -apple-system, BlinkMacSystemFont, sans-serif";
+      ctx.font = font;
+      const metrics = ctx.measureText(text);
+      const padX = options.padX !== undefined ? options.padX : 7;
+      const padY = options.padY !== undefined ? options.padY : 4;
+      const w = metrics.width + padX * 2;
+      const h = 16 + padY;
+
+      const rx = x - w / 2;
+      const ry = y - h / 2;
+      const r = 5;
+
+      ctx.fillStyle = options.bgColor || "#ffffff";
+      ctx.strokeStyle = options.borderColor || "#cbd5e1";
+      ctx.lineWidth = options.borderWidth || 1.2;
+
+      ctx.beginPath();
+      ctx.moveTo(rx + r, ry);
+      ctx.lineTo(rx + w - r, ry);
+      ctx.quadraticCurveTo(rx + w, ry, rx + w, ry + r);
+      ctx.lineTo(rx + w, ry + h - r);
+      ctx.quadraticCurveTo(rx + w, ry + h, rx + w - r, ry + h);
+      ctx.lineTo(rx + r, ry + h);
+      ctx.quadraticCurveTo(rx, ry + h, rx, ry + h - r);
+      ctx.lineTo(rx, ry + r);
+      ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = options.textColor || "#0f172a";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y + 0.5);
+      ctx.restore();
+    }
+
+    function drawGrid() {
+      const rect = container.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      const zoom = state.view.zoom;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const screenStep = zoom * state.view.gridSize;
+      const subStep = screenStep / 5;
+
+      const cx = w / 2 + state.view.panX;
+      const cy = h / 2 + state.view.panY;
+
+      // Millimeter graph subdivisions
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "#eef2f6";
+      ctx.beginPath();
+      for (let x = cx % subStep; x < w; x += subStep) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      }
+      for (let y = cy % subStep; y < h; y += subStep) {
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+
+      // Major grid
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.beginPath();
+      for (let x = cx % screenStep; x < w; x += screenStep) {
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      }
+      for (let y = cy % screenStep; y < h; y += screenStep) {
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
+
+      // Axes
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = "#475569";
+      ctx.beginPath();
+      ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+      ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+      ctx.stroke();
+
+      drawTextBadge("+x (0°)", w - 42, cy - 15, { textColor: "#475569", borderColor: "#cbd5e1" });
+      drawTextBadge("+y (90°)", cx + 42, 18, { textColor: "#475569", borderColor: "#cbd5e1" });
+      drawTextBadge("-x (180°)", 44, cy - 15, { textColor: "#475569", borderColor: "#cbd5e1" });
+      drawTextBadge("-y (270°)", cx + 45, h - 18, { textColor: "#475569", borderColor: "#cbd5e1" });
+      drawTextBadge("O(0,0)", cx - 30, cy + 18, { textColor: "#475569", borderColor: "#cbd5e1" });
+    }
+
+    function drawArrow(fromX, fromY, toX, toY, color, width = 3.5, headLen = 16) {
+      const angle = Math.atan2(toY - fromY, toX - fromX);
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(
+        toX - headLen * Math.cos(angle - Math.PI / 6),
+        toY - headLen * Math.sin(angle - Math.PI / 6)
+      );
+      ctx.lineTo(
+        toX - headLen * Math.cos(angle + Math.PI / 6),
+        toY - headLen * Math.sin(angle + Math.PI / 6)
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function getVectorGeometry(force) {
+      const rad = degToRad(force.angle);
+      const appScreen = worldToScreen(force.appX, force.appY);
+      const lenPx = force.magnitude * getPxPerUnit();
+
+      const dx = lenPx * Math.cos(rad);
+      const dy = -lenPx * Math.sin(rad);
+
+      const outerScreen = { x: appScreen.x + dx, y: appScreen.y + dy };
+
+      let fromScreen, toScreen;
+      if (force.sense === "pulling") {
+        fromScreen = { x: appScreen.x, y: appScreen.y };
+        toScreen = { x: outerScreen.x, y: outerScreen.y };
+      } else {
+        // Pushing: Shaft identical, arrowhead points into P
+        fromScreen = { x: outerScreen.x, y: outerScreen.y };
+        toScreen = { x: appScreen.x, y: appScreen.y };
+      }
+
+      return { appScreen, outerScreen, fromScreen, toScreen, rad };
+    }
+
+    function drawForceVector(force, isSelected, arcRadius, forceIndex) {
+      const { appScreen, outerScreen, fromScreen, toScreen } = getVectorGeometry(force);
+      const { fx, fy } = getComponents(force);
+
+      // 1. Rectangular Components
+      if (state.options.showComponents && Math.abs(fx) > 0.05 && Math.abs(fy) > 0.05) {
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        const cornerScreen = { x: outerScreen.x, y: appScreen.y };
+
+        if (force.sense === "pulling") {
+          drawArrow(appScreen.x, appScreen.y, cornerScreen.x, cornerScreen.y, force.color + "90", 2.0, 9);
+          drawArrow(cornerScreen.x, cornerScreen.y, outerScreen.x, outerScreen.y, force.color + "90", 2.0, 9);
+        } else {
+          drawArrow(outerScreen.x, outerScreen.y, cornerScreen.x, cornerScreen.y, force.color + "90", 2.0, 9);
+          drawArrow(cornerScreen.x, cornerScreen.y, appScreen.x, appScreen.y, force.color + "90", 2.0, 9);
+        }
+        ctx.restore();
+
+        const signX = fx >= 0 ? "+" : "";
+        const signY = fy >= 0 ? "+" : "";
+        const midX = (appScreen.x + cornerScreen.x) / 2;
+        const midY = (cornerScreen.y + outerScreen.y) / 2;
+
+        const offsetBadgeY = (fy >= 0) ? appScreen.y + 18 : appScreen.y - 18;
+        const offsetBadgeX = (fx >= 0) ? cornerScreen.x + 42 : cornerScreen.x - 42;
+
+        drawTextBadge(`Fx: ${signX}${fx.toFixed(1)}`, midX, offsetBadgeY, {
+          textColor: force.color,
+          borderColor: force.color + "70",
+          font: "bold 11px monospace"
+        });
+
+        drawTextBadge(`Fy: ${signY}${fy.toFixed(1)}`, offsetBadgeX, midY, {
+          textColor: force.color,
+          borderColor: force.color + "70",
+          font: "bold 11px monospace"
+        });
+      }
+
+      // 2. Main Vector
+      drawArrow(fromScreen.x, fromScreen.y, toScreen.x, toScreen.y, force.color, isSelected ? 4.8 : 3.5, 16);
+
+      // 3. Application Point Handle
+      ctx.beginPath();
+      ctx.arc(appScreen.x, appScreen.y, 6.5, 0, 2 * Math.PI);
+      ctx.fillStyle = force.color;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = "#ffffff";
+      ctx.stroke();
+
+      // 4. Draggable Outer Tip Target Handle
+      const isHoveredOuter = state.hoveredHandle && state.hoveredHandle.type === 'outerTip' && state.hoveredHandle.index === forceIndex;
+      if (isSelected || isHoveredOuter) {
+        ctx.beginPath();
+        ctx.arc(outerScreen.x, outerScreen.y, 8, 0, 2 * Math.PI);
+        ctx.strokeStyle = force.color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // 5. Force Magnitude Badge
+      const angleRad = degToRad(force.angle);
+      const nx = Math.sin(angleRad);
+      const ny = Math.cos(angleRad);
+      const midPointX = appScreen.x * 0.35 + outerScreen.x * 0.65;
+      const midPointY = appScreen.y * 0.35 + outerScreen.y * 0.65;
+
+      const labelDist = 24;
+      const labelPosX = midPointX + nx * labelDist;
+      const labelPosY = midPointY + ny * labelDist;
+
+      const senseSuffix = force.sense === "pushing" ? " (C)" : " (T)";
+      drawTextBadge(
+        `${force.name} = ${force.magnitude} ${state.unit}${senseSuffix}`,
+        labelPosX,
+        labelPosY,
+        {
+          textColor: force.color,
+          borderColor: force.color,
+          borderWidth: 1.6,
+          font: "bold 12.5px sans-serif",
+          padX: 8,
+          padY: 4
+        }
+      );
+
+      // 6. Angle Arc from +x Axis
+      if (state.options.showAngles && force.magnitude > 0) {
+        drawAngleArcFromX(force, appScreen, arcRadius);
+      }
+    }
+
+    function drawAngleArcFromX(force, origin, radius) {
+      const thetaDeg = force.angle;
+      const thetaRad = degToRad(thetaDeg);
+
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(origin.x + radius + 24, origin.y);
+      ctx.stroke();
+
+      if (thetaDeg > 1) {
+        ctx.setLineDash([]);
+        ctx.strokeStyle = force.color;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(origin.x, origin.y, radius, 0, -thetaRad, true);
+        ctx.stroke();
+
+        const tipArcX = origin.x + radius * Math.cos(-thetaRad);
+        const tipArcY = origin.y + radius * Math.sin(-thetaRad);
+        const tangent = -thetaRad - Math.PI / 2;
+
+        ctx.fillStyle = force.color;
+        ctx.beginPath();
+        ctx.moveTo(tipArcX, tipArcY);
+        ctx.lineTo(
+          tipArcX - 7 * Math.cos(tangent - Math.PI / 6),
+          tipArcY - 7 * Math.sin(tangent - Math.PI / 6)
+        );
+        ctx.lineTo(
+          tipArcX - 7 * Math.cos(tangent + Math.PI / 6),
+          tipArcY - 7 * Math.sin(tangent + Math.PI / 6)
+        );
+        ctx.closePath();
+        ctx.fill();
+
+        const bisector = -thetaRad / 2;
+        const textDist = radius + 16;
+        const badgeX = origin.x + textDist * Math.cos(bisector);
+        const badgeY = origin.y + textDist * Math.sin(bisector);
+
+        drawTextBadge(`${thetaDeg.toFixed(0)}°`, badgeX, badgeY, {
+          textColor: force.color,
+          borderColor: force.color + "70",
+          font: "bold 11.5px sans-serif",
+          padX: 5,
+          padY: 2
+        });
+      } else {
+        drawTextBadge(`0°`, origin.x + radius + 12, origin.y - 12, {
+          textColor: force.color,
+          borderColor: force.color + "70"
+        });
+      }
+      ctx.restore();
+    }
+
+    function drawResultantVector(res, maxForceArcRadius) {
+      if (state.forces.length === 0 || res.magnitude < 0.001) return;
+
+      const appScreen = worldToScreen(res.avgAppX, res.avgAppY);
+      const pxPerUnit = getPxPerUnit();
+      const vecDx = res.sumFx * pxPerUnit;
+      const vecDy = -res.sumFy * pxPerUnit;
+      const tipX = appScreen.x + vecDx;
+      const tipY = appScreen.y + vecDy;
+
+      if (state.options.showComponents && Math.abs(res.sumFx) > 0.1 && Math.abs(res.sumFy) > 0.1) {
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(124, 58, 237, 0.4)";
+        ctx.strokeRect(appScreen.x, appScreen.y, vecDx, vecDy);
+        ctx.restore();
+      }
+
+      drawArrow(appScreen.x, appScreen.y, tipX, tipY, RESULTANT_COLOR, 5.2, 20);
+
+      drawTextBadge(
+        `R = ${res.magnitude.toFixed(1)} ${state.unit} (θ = ${res.thetaDeg.toFixed(1)}°)`,
+        tipX + 18,
+        tipY - 18,
+        {
+          textColor: RESULTANT_COLOR,
+          borderColor: RESULTANT_COLOR,
+          borderWidth: 2,
+          font: "bold 13px sans-serif",
+          padX: 9,
+          padY: 5
+        }
+      );
+
+      if (state.options.showAngles) {
+        const resArcRadius = Math.max(80, maxForceArcRadius + 22);
+        const dummyResForce = { angle: res.thetaDeg, color: RESULTANT_COLOR };
+        drawAngleArcFromX(dummyResForce, appScreen, resArcRadius);
+      }
+    }
+
+    function calculateResultant() {
+      let sumFx = 0;
+      let sumFy = 0;
+      let avgAppX = 0;
+      let avgAppY = 0;
+
+      state.forces.forEach(f => {
+        const { fx, fy } = getComponents(f);
+        sumFx += fx;
+        sumFy += fy;
+        avgAppX += f.appX;
+        avgAppY += f.appY;
+      });
+
+      const n = state.forces.length || 1;
+      avgAppX /= n;
+      avgAppY /= n;
+
+      const magnitude = Math.sqrt(sumFx * sumFx + sumFy * sumFy);
+      const thetaRad = Math.atan2(sumFy, sumFx);
+      const thetaDeg = (radToDeg(thetaRad) + 360) % 360;
+
+      return { sumFx, sumFy, magnitude, thetaDeg, avgAppX, avgAppY };
+    }
+
+    function updateUI() {
+      const res = calculateResultant();
+
+      if (state.options.showResultant) {
+        resultBox.classList.remove("disabled");
+        resultBadge.textContent = "Calculated";
+        resultBadge.style.color = RESULTANT_COLOR;
+        resultHiddenMsg.style.display = "none";
+        resultDataBox.style.display = "block";
+
+        valSumFx.textContent = `${res.sumFx >= 0 ? "+" : ""}${res.sumFx.toFixed(2)} ${state.unit}`;
+        valSumFy.textContent = `${res.sumFy >= 0 ? "+" : ""}${res.sumFy.toFixed(2)} ${state.unit}`;
+        valResMag.textContent = `${res.magnitude.toFixed(2)} ${state.unit}`;
+        valResTheta.textContent = `${res.thetaDeg.toFixed(1)}° from +x`;
+      } else {
+        resultBox.classList.add("disabled");
+        resultBadge.textContent = "Hidden";
+        resultBadge.style.color = "#64748b";
+        resultHiddenMsg.style.display = "block";
+        resultDataBox.style.display = "none";
+      }
+
+      forcesCountEl.textContent = state.forces.length;
+      labelZoomPct.textContent = `${Math.round((state.view.zoom / BASE_ZOOM) * 100)}%`;
+    }
+
+    function render() {
+      drawGrid();
+
+      const originCounts = {};
+      let maxRadiusUsed = 40;
+
+      state.forces.forEach((force, idx) => {
+        const key = `${force.appX.toFixed(2)},${force.appY.toFixed(2)}`;
+        const indexAtPoint = originCounts[key] || 0;
+        originCounts[key] = indexAtPoint + 1;
+
+        const arcRadius = 36 + indexAtPoint * 20;
+        if (arcRadius > maxRadiusUsed) maxRadiusUsed = arcRadius;
+
+        const isSelected = force.id === state.selectedForceId;
+        drawForceVector(force, isSelected, arcRadius, idx);
+      });
+
+      if (state.options.showResultant) {
+        const res = calculateResultant();
+        drawResultantVector(res, maxRadiusUsed);
+      }
+    }
+
+    function renderForceList() {
+      forcesContainer.innerHTML = "";
+
+      if (state.forces.length === 0) {
+        forcesContainer.innerHTML = `
+          <div class="empty-state">
+            <strong>No forces applied yet.</strong>
+            <span>Click <em>"+ Add Force"</em> or load an example to begin.</span>
+          </div>
+        `;
+        return;
+      }
+
+      state.forces.forEach(f => {
+        const card = document.createElement("div");
+        card.className = `force-card ${f.id === state.selectedForceId ? 'active' : ''}`;
+        card.style.borderLeftColor = f.color;
+
+        card.innerHTML = `
+          <div class="force-card-header">
+            <span class="force-title" style="color:${f.color}">
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${f.color}"></span>
+              ${f.name}
+            </span>
+            <button class="force-delete" title="Remove force" data-id="${f.id}">&times;</button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Point X</label>
+              <input type="number" step="0.5" value="${f.appX}" data-field="appX" data-id="${f.id}">
+            </div>
+            <div class="form-group">
+              <label>Point Y</label>
+              <input type="number" step="0.5" value="${f.appY}" data-field="appY" data-id="${f.id}">
+            </div>
+
+            <div class="form-group">
+              <label>Magnitude (${state.unit})</label>
+              <input type="number" min="0" step="5" value="${f.magnitude}" data-field="magnitude" data-id="${f.id}">
+            </div>
+
+            <div class="form-group">
+              <label>Sense</label>
+              <select data-field="sense" data-id="${f.id}">
+                <option value="pulling" ${f.sense === 'pulling' ? 'selected' : ''}>Pulling (Tension)</option>
+                <option value="pushing" ${f.sense === 'pushing' ? 'selected' : ''}>Pushing (Compression)</option>
+              </select>
+            </div>
+
+            <div class="form-group full">
+              <label>Angle &theta; from +x (0° - 360° CCW)</label>
+              <input type="number" min="0" max="360" step="1" value="${f.angle}" data-field="angle" data-id="${f.id}">
+            </div>
+          </div>
+        `;
+
+        card.addEventListener("click", (e) => {
+          if (e.target.tagName !== "INPUT" && e.target.tagName !== "SELECT" && e.target.tagName !== "BUTTON") {
+            state.selectedForceId = f.id;
+            renderForceList();
+            render();
+          }
+        });
+
+        forcesContainer.appendChild(card);
+      });
+
+      forcesContainer.querySelectorAll("input, select").forEach(input => {
+        input.addEventListener("input", (e) => {
+          const id = parseInt(e.target.dataset.id);
+          const field = e.target.dataset.field;
+          const force = state.forces.find(item => item.id === id);
+          if (!force) return;
+
+          if (field === "magnitude" || field === "appX" || field === "appY") {
+            force[field] = parseFloat(e.target.value) || 0;
+          } else if (field === "angle") {
+            let val = parseFloat(e.target.value) || 0;
+            force.angle = ((val % 360) + 360) % 360;
+          } else {
+            force[field] = e.target.value;
+          }
+
+          updateUI();
+          render();
+        });
+      });
+
+      forcesContainer.querySelectorAll(".force-delete").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const id = parseInt(btn.dataset.id);
+          state.forces = state.forces.filter(f => f.id !== id);
+          if (state.selectedForceId === id) state.selectedForceId = null;
+          updateUI();
+          renderForceList();
+          render();
+        });
+      });
+    }
+
+    // Centered Zoom Helper for Buttons
+    function zoomCenter(factor) {
+      const oldZoom = state.view.zoom;
+      const newZoom = Math.max(12, Math.min(320, oldZoom * factor));
+      if (newZoom === oldZoom) return;
+
+      state.view.panX = state.view.panX * (newZoom / oldZoom);
+      state.view.panY = state.view.panY * (newZoom / oldZoom);
+      state.view.zoom = newZoom;
+
+      updateUI();
+      render();
+    }
+
+    // Direct Canvas Interaction
+    canvas.addEventListener("mousedown", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseScreen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+      // 1. Drag outer tip (Rotates angle & changes magnitude)
+      for (let i = 0; i < state.forces.length; i++) {
+        const force = state.forces[i];
+        const { outerScreen } = getVectorGeometry(force);
+        const dist = Math.hypot(mouseScreen.x - outerScreen.x, mouseScreen.y - outerScreen.y);
+
+        if (dist < 15) {
+          state.dragMode = 'outerTip';
+          state.activeDragIndex = i;
+          state.selectedForceId = force.id;
+          renderForceList();
+          render();
+          return;
+        }
+      }
+
+      // 2. Drag application point P (Moves anchor)
+      for (let i = 0; i < state.forces.length; i++) {
+        const force = state.forces[i];
+        const { appScreen } = getVectorGeometry(force);
+        const dist = Math.hypot(mouseScreen.x - appScreen.x, mouseScreen.y - appScreen.y);
+
+        if (dist < 15) {
+          state.dragMode = 'appPoint';
+          state.activeDragIndex = i;
+          state.selectedForceId = force.id;
+          renderForceList();
+          render();
+          return;
+        }
+      }
+
+      // 3. Pan
+      state.dragMode = 'pan';
+      state.dragStart = { x: e.clientX - state.view.panX, y: e.clientY - state.view.panY };
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const mouseScreen = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const worldPos = screenToWorld(mouseScreen.x, mouseScreen.y);
+
+      if (state.dragMode === 'appPoint' && state.activeDragIndex >= 0) {
+        const force = state.forces[state.activeDragIndex];
+        force.appX = snap(worldPos.x);
+        force.appY = snap(worldPos.y);
+        updateUI();
+        render();
+        return;
+      }
+
+      if (state.dragMode === 'outerTip' && state.activeDragIndex >= 0) {
+        const force = state.forces[state.activeDragIndex];
+        const appScreen = worldToScreen(force.appX, force.appY);
+
+        const dx = mouseScreen.x - appScreen.x;
+        const dy = -(mouseScreen.y - appScreen.y);
+
+        let rad = Math.atan2(dy, dx);
+        let deg = (radToDeg(rad) + 360) % 360;
+        const screenLen = Math.hypot(dx, dy);
+
+        // Uses current zoom-dependent scale
+        let newMag = screenLen / getPxPerUnit();
+
+        if (state.options.snapToGrid) {
+          deg = Math.round(deg / 5) * 5;
+          newMag = Math.max(5, Math.round(newMag / 5) * 5);
+        }
+
+        force.angle = (deg + 360) % 360;
+        force.magnitude = Math.max(1, Math.round(newMag));
+
+        updateUI();
+        render();
+        return;
+      }
+
+      if (state.dragMode === 'pan') {
+        state.view.panX = e.clientX - state.dragStart.x;
+        state.view.panY = e.clientY - state.dragStart.y;
+        render();
+        return;
+      }
+
+      // Cursor hover check
+      let foundHandle = null;
+      for (let i = 0; i < state.forces.length; i++) {
+        const force = state.forces[i];
+        const { appScreen, outerScreen } = getVectorGeometry(force);
+        if (Math.hypot(mouseScreen.x - outerScreen.x, mouseScreen.y - outerScreen.y) < 15) {
+          foundHandle = { type: 'outerTip', index: i };
+          break;
+        }
+        if (Math.hypot(mouseScreen.x - appScreen.x, mouseScreen.y - appScreen.y) < 15) {
+          foundHandle = { type: 'appPoint', index: i };
+          break;
+        }
+      }
+
+      state.hoveredHandle = foundHandle;
+      if (foundHandle) {
+        canvas.style.cursor = (foundHandle.type === 'outerTip') ? 'crosshair' : 'move';
+      } else {
+        canvas.style.cursor = 'default';
+      }
+      render();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (state.dragMode === 'appPoint' || state.dragMode === 'outerTip') {
+        renderForceList();
+      }
+      state.dragMode = null;
+      state.activeDragIndex = -1;
+    });
+
+    // Smooth Cursor-Centric Wheel Zoom
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      // Current world position under cursor before zoom
+      const worldPos = screenToWorld(mouseX, mouseY);
+
+      const zoomFactor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+      const oldZoom = state.view.zoom;
+      const newZoom = Math.max(12, Math.min(320, oldZoom * zoomFactor));
+
+      if (newZoom === oldZoom) return;
+
+      state.view.zoom = newZoom;
+
+      // Adjust pan so the world coordinates under the mouse remain stationary
+      state.view.panX = mouseX - rect.width / 2 - worldPos.x * newZoom;
+      state.view.panY = -(mouseY - rect.height / 2) - worldPos.y * newZoom;
+
+      updateUI();
+      render();
+    }, { passive: false });
+
+    // Toolbar Listeners
+    sliderVectorScale.addEventListener("input", (e) => {
+      state.vectorScaleMultiplier = parseFloat(e.target.value);
+      labelScaleVal.textContent = `${state.vectorScaleMultiplier.toFixed(1)}×`;
+      render();
+    });
+
+    document.getElementById("btn-add-force").addEventListener("click", () => {
+      const f = createForce(0, 0, 50, 45, "pulling");
+      state.forces.push(f);
+      state.selectedForceId = f.id;
+      updateUI();
+      renderForceList();
+      render();
+    });
+
+    document.getElementById("btn-clear").addEventListener("click", () => {
+      state.forces = [];
+      state.selectedForceId = null;
+      updateUI();
+      renderForceList();
+      render();
+    });
+
+    document.getElementById("btn-example").addEventListener("click", () => {
+      state.forces = [
+        createForce(0, 0, 60, 30, "pulling"),  // 60 kN @ 30 deg
+        createForce(0, 0, 80, 135, "pulling"), // 80 kN @ 135 deg
+        createForce(0, 0, 50, 60, "pushing")   // 50 kN @ 60 deg pushing
+      ];
+      state.forces[0].name = "F1";
+      state.forces[1].name = "F2";
+      state.forces[2].name = "F3";
+      updateUI();
+      renderForceList();
+      render();
+    });
+
+    document.getElementById("btn-recenter").addEventListener("click", () => {
+      state.view.panX = 0;
+      state.view.panY = 0;
+      state.view.zoom = BASE_ZOOM;
+      updateUI();
+      render();
+    });
+
+    document.getElementById("btn-zoom-in").addEventListener("click", () => {
+      zoomCenter(1.2);
+    });
+
+    document.getElementById("btn-zoom-out").addEventListener("click", () => {
+      zoomCenter(1 / 1.2);
+    });
+
+    globalUnitSelect.addEventListener("change", (e) => {
+      state.unit = e.target.value;
+      updateUI();
+      renderForceList();
+      render();
+    });
+
+    chkResultant.addEventListener("change", (e) => {
+      state.options.showResultant = e.target.checked;
+      updateUI();
+      render();
+    });
+
+    chkComponents.addEventListener("change", (e) => {
+      state.options.showComponents = e.target.checked;
+      render();
+    });
+
+    chkAngles.addEventListener("change", (e) => {
+      state.options.showAngles = e.target.checked;
+      render();
+    });
+
+    chkSnap.addEventListener("change", (e) => {
+      state.options.snapToGrid = e.target.checked;
+    });
+
+    window.addEventListener("resize", resize);
+
+    // Boot: Blank canvas
+    resize();
+    updateUI();
+    renderForceList();
+  </script>
+</body>
+</html>
