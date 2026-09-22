@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Support Reaction Finder & Column/Beam Analyzer</title>
+  <title>Support Reaction Finder & Beam/Column Analyzer</title>
   <style>
     :root {
       --bg-color: #f8fafc;
@@ -523,7 +523,7 @@
               <input type="number" id="load-udl-len" step="0.5" value="2.0">
             </div>
             <div class="form-group full">
-              <label>Magnitude w (kN/m) [Positive = Downward]</label>
+              <label>Intensity w (kN/m) [Positive = Downward]</label>
               <input type="number" id="load-udl-w" step="2" value="10">
             </div>
           </div>
@@ -647,7 +647,7 @@
       loads: [],
       reactions: {},
       determinacy: { isDeterminate: false, isLabile: true, degree: 0, r: 0, required: 3 },
-      view: { panX: 0, panY: -60, zoom: 42 },
+      view: { panX: 0, panY: -80, zoom: 42 },
       options: {
         snapGrid: true,
         showN: false,
@@ -662,7 +662,7 @@
     let nextNodeId = 1;
     let nextMemberId = 1;
     let nextLoadId = 1;
-    let memberSamples = {};
+    let diagramSamples = [];
 
     const canvas = document.getElementById("stage");
     const ctx = canvas.getContext("2d");
@@ -774,14 +774,27 @@
       return x;
     }
 
-    // --- Determinacy & Equilibrium Analysis ---
+    // --- Global Cut-Section Absolute Coordinate Resolver ---
+    function getGlobalLoadPosition(ld) {
+      const mem = state.members.find(m => m.id === ld.memberId);
+      if (!mem) return { x: 0, y: 0 };
+      const n1 = state.nodes.find(n => n.id === mem.node1);
+      const n2 = state.nodes.find(n => n.id === mem.node2);
+      const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+      const ratio = L > 0 ? (ld.dist / L) : 0;
+      return {
+        x: n1.x + (n2.x - n1.x) * ratio,
+        y: n1.y + (n2.y - n1.y) * ratio
+      };
+    }
+
     function analyzeSystem() {
       if (state.nodes.length === 0 || state.members.length === 0) {
         statusCard.className = "status-banner empty";
         statusTitle.textContent = "System Empty";
         statusDesc.textContent = "Define nodes and connect members to begin structural analysis.";
         state.reactions = {};
-        memberSamples = {};
+        diagramSamples = [];
         state.extremes = { maxN: 0, maxV: 0, maxM: 0, maxDelta: 0 };
         updateReactionsUI();
         return;
@@ -821,13 +834,13 @@
         statusTitle.textContent = "⚠ System is Labile (Mechanism / Unstable)";
         statusDesc.textContent = `Reactions (${r}) < Required Equations (${required}). The structure cannot maintain equilibrium.`;
         state.reactions = {};
-        memberSamples = {};
+        diagramSamples = [];
       } else if (deg > 0) {
         statusCard.className = "status-banner indeterminate";
         statusTitle.textContent = `Alert: Statically Indeterminate (${deg}° degree)`;
         statusDesc.textContent = `Reactions (${r}) > Required Equations (${required}). Requires elastic deformation compatibility.`;
         state.reactions = {};
-        memberSamples = {};
+        diagramSamples = [];
       } else {
         const numEq = 3 + c;
         const A = Array.from({ length: numEq }, () => new Array(numEq).fill(0));
@@ -835,21 +848,15 @@
 
         let sumFx_loads = 0, sumFy_loads = 0, sumMO_loads = 0;
         state.loads.forEach(ld => {
-          const mem = state.members.find(m => m.id === ld.memberId);
-          if (!mem) return;
-          const n1 = state.nodes.find(n => n.id === mem.node1);
-          const n2 = state.nodes.find(n => n.id === mem.node2);
-          const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-
           if (ld.type === "point") {
-            const ratio = L > 0 ? (ld.dist / L) : 0;
-            const px = n1.x + (n2.x - n1.x) * ratio;
-            const py = n1.y + (n2.y - n1.y) * ratio;
+            const pos = getGlobalLoadPosition(ld);
             sumFx_loads += ld.fx;
             sumFy_loads += ld.fy;
-            sumMO_loads += (px * ld.fy - py * ld.fx);
+            sumMO_loads += (pos.x * ld.fy - pos.y * ld.fx);
           } else if (ld.type === "udl") {
-            const minX = Math.min(n1.x, n2.x);
+            const mem = state.members.find(m => m.id === ld.memberId);
+            const n1 = state.nodes.find(n => n.id === mem.node1);
+            const minX = Math.min(n1.x, state.nodes.find(n => n.id === mem.node2).x);
             const startX = minX + ld.start;
             const loadSpan = ld.len;
             const totalW = -ld.w * loadSpan;
@@ -877,17 +884,12 @@
         hingeNodes.forEach(hNode => {
           let sumM_h_loads = 0;
           state.loads.forEach(ld => {
-            const mem = state.members.find(m => m.id === ld.memberId);
-            if (!mem) return;
-            const n1 = state.nodes.find(n => n.id === mem.node1);
-            const n2 = state.nodes.find(n => n.id === mem.node2);
-            const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-
             if (ld.type === "point") {
-              const lx = n1.x + (n2.x - n1.x) * (L > 0 ? ld.dist / L : 0);
-              if (lx < hNode.x) sumM_h_loads += ld.fy * (lx - hNode.x);
+              const pos = getGlobalLoadPosition(ld);
+              if (pos.x < hNode.x) sumM_h_loads += ld.fy * (pos.x - hNode.x);
             } else if (ld.type === "udl") {
-              const minX = Math.min(n1.x, n2.x);
+              const mem = state.members.find(m => m.id === ld.memberId);
+              const minX = Math.min(state.nodes.find(n => n.id === mem.node1).x, state.nodes.find(n => n.id === mem.node2).x);
               const startX = minX + ld.start;
               const centroidX = startX + ld.len / 2;
               if (centroidX < hNode.x) {
@@ -926,7 +928,7 @@
           statusTitle.textContent = "⚠ Geometrically Unstable / Mechanism";
           statusDesc.textContent = "The equilibrium equations are linearly dependent.";
           state.reactions = {};
-          memberSamples = {};
+          diagramSamples = [];
         }
       }
 
@@ -963,74 +965,155 @@
       });
     }
 
-    // --- Local Coordinates Internal Force Calculations (Works for Columns & Beams) ---
+    // --- Rigorous Cut-Section Equilibrium Engine (Cuts entire structure) ---
     function computeInternalDiagrams() {
-      memberSamples = {};
+      diagramSamples = [];
       if (state.members.length === 0 || Object.keys(state.reactions).length === 0) return;
 
+      const isVertical = isSystemVertical();
       let globalMaxN = 0, globalMaxV = 0, globalMaxM = 0;
 
-      state.members.forEach(mem => {
-        const n1 = state.nodes.find(n => n.id === mem.node1);
-        const n2 = state.nodes.find(n => n.id === mem.node2);
-        const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-        if (L < 1e-4) return;
+      if (isVertical) {
+        // Vertical Column Integration along Y from bottom to top
+        const yCoords = state.nodes.map(n => n.y).sort((a, b) => a - b);
+        const yMin = yCoords[0];
+        const yMax = yCoords[yCoords.length - 1];
+        if (yMax - yMin < 1e-4) return;
 
-        const tx = (n2.x - n1.x) / L;
-        const ty = (n2.y - n1.y) / L;
-        const nx = -ty;
-        const ny = tx;
-
-        const numPts = 100;
-        const samples = [];
+        const numPts = 160;
+        const dy = (yMax - yMin) / numPts;
 
         for (let i = 0; i <= numPts; i++) {
-          const s = (i / numPts) * L;
-          const curX = n1.x + tx * s;
-          const curY = n1.y + ty * s;
+          const curY = yMin + i * dy;
+          let Fx_below = 0, Fy_below = 0, M_below = 0;
 
-          let Fx_left = 0, Fy_left = 0, M_res = 0;
+          // Reactions below cut
+          Object.keys(state.reactions).forEach(nodeId => {
+            const nd = state.nodes.find(n => n.id == nodeId);
+            if (nd && nd.y <= curY + 1e-5) {
+              const r = state.reactions[nodeId];
+              Fx_below += r.Rx;
+              Fy_below += r.Ry;
+              M_below += r.Rx * (curY - nd.y) - r.M;
+            }
+          });
 
-          if (state.reactions[n1.id]) {
-            const r = state.reactions[n1.id];
-            Fx_left += r.Rx;
-            Fy_left += r.Ry;
-            M_res += r.Ry * (curX - n1.x) - r.Rx * (curY - n1.y) - r.M;
-          }
-
+          // Loads below cut
           state.loads.forEach(ld => {
-            if (ld.memberId === mem.id) {
-              if (ld.type === "point" && ld.dist <= s + 1e-5) {
-                const px = n1.x + tx * ld.dist;
-                const py = n1.y + ty * ld.dist;
-                Fx_left += ld.fx;
-                Fy_left += ld.fy;
-                M_res += ld.fy * (curX - px) - ld.fx * (curY - py);
-              } else if (ld.type === "udl" && s > ld.start) {
-                const loadedL = Math.min(s, ld.start + ld.len) - ld.start;
-                const w_total = -ld.w * loadedL;
-                const midDist = ld.start + loadedL / 2;
-                const midX = n1.x + tx * midDist;
-                const midY = n1.y + ty * midDist;
-                Fy_left += w_total;
-                M_res += w_total * (curX - midX);
+            if (ld.type === "point") {
+              const pos = getGlobalLoadPosition(ld);
+              if (pos.y <= curY + 1e-5) {
+                Fx_below += ld.fx;
+                Fy_below += ld.fy;
+                M_below += ld.fx * (curY - pos.y);
               }
             }
           });
 
-          const N = -(Fx_left * tx + Fy_left * ty);
-          const V = (Fx_left * nx + Fy_left * ny);
+          // Column convention: vertical is axial
+          const N = -Fy_below; // Compression is negative
+          const V = Fx_below;
+          const M = M_below;
+
+          if (Math.abs(N) > globalMaxN) globalMaxN = Math.abs(N);
+          if (Math.abs(V) > globalMaxV) globalMaxV = Math.abs(V);
+          if (Math.abs(M) > globalMaxM) globalMaxM = Math.abs(M);
+
+          diagramSamples.push({ s: curY, x: state.nodes[0].x, y: curY, N, V, M, defl: 0 });
+        }
+
+      } else {
+        // Horizontal Beam Integration along X from left to right (Continuous across all spans)
+        const xCoords = state.nodes.map(n => n.x).sort((a, b) => a - b);
+        const xMin = xCoords[0];
+        const xMax = xCoords[xCoords.length - 1];
+        if (xMax - xMin < 1e-4) return;
+
+        // Collect all discontinuity stations to sample right before and right after
+        const criticalX = new Set();
+        state.nodes.forEach(n => criticalX.add(n.x));
+        state.loads.forEach(ld => {
+          if (ld.type === "point") {
+            criticalX.add(getGlobalLoadPosition(ld).x);
+          } else if (ld.type === "udl") {
+            const mem = state.members.find(m => m.id === ld.memberId);
+            const n1 = state.nodes.find(n => n.id === mem.node1);
+            const minX = Math.min(n1.x, state.nodes.find(n => n.id === mem.node2).x);
+            criticalX.add(minX + ld.start);
+            criticalX.add(minX + ld.start + ld.len);
+          }
+        });
+
+        const sortedCrit = Array.from(criticalX).sort((a, b) => a - b);
+        const sampleXList = [];
+        const numIntervals = 20;
+
+        for (let i = 0; i < sortedCrit.length; i++) {
+          const xi = sortedCrit[i];
+          if (i > 0) {
+            const prev = sortedCrit[i - 1];
+            for (let k = 1; k < numIntervals; k++) {
+              sampleXList.push(prev + (k / numIntervals) * (xi - prev));
+            }
+          }
+          sampleXList.push(xi - 1e-5);
+          sampleXList.push(xi + 1e-5);
+        }
+
+        sampleXList.sort((a, b) => a - b);
+
+        sampleXList.forEach(curX => {
+          if (curX < xMin - 1e-4 || curX > xMax + 1e-4) return;
+          let Fx_left = 0, Fy_left = 0, M_res = 0;
+
+          // Reactions to left of cut
+          Object.keys(state.reactions).forEach(nodeId => {
+            const nd = state.nodes.find(n => n.id == nodeId);
+            if (nd && nd.x <= curX) {
+              const r = state.reactions[nodeId];
+              Fx_left += r.Rx;
+              Fy_left += r.Ry;
+              M_res += r.Ry * (curX - nd.x) - r.M;
+            }
+          });
+
+          // Loads to left of cut
+          state.loads.forEach(ld => {
+            if (ld.type === "point") {
+              const pos = getGlobalLoadPosition(ld);
+              if (pos.x <= curX) {
+                Fx_left += ld.fx;
+                Fy_left += ld.fy;
+                M_res += ld.fy * (curX - pos.x);
+              }
+            } else if (ld.type === "udl") {
+              const mem = state.members.find(m => m.id === ld.memberId);
+              const n1 = state.nodes.find(n => n.id === mem.node1);
+              const minX = Math.min(n1.x, state.nodes.find(n => n.id === mem.node2).x);
+              const startX = minX + ld.start;
+              const endX = startX + ld.len;
+
+              if (curX > startX) {
+                const loadedL = Math.min(curX, endX) - startX;
+                const totalW = -ld.w * loadedL; // Downward
+                const centroidX = startX + loadedL / 2;
+                Fy_left += totalW;
+                M_res += totalW * (curX - centroidX);
+              }
+            }
+          });
+
+          const N = -Fx_left;
+          const V = Fy_left;
           const M = M_res;
 
           if (Math.abs(N) > globalMaxN) globalMaxN = Math.abs(N);
           if (Math.abs(V) > globalMaxV) globalMaxV = Math.abs(V);
           if (Math.abs(M) > globalMaxM) globalMaxM = Math.abs(M);
 
-          samples.push({ s, x: curX, y: curY, N, V, M, defl: 0 });
-        }
-
-        memberSamples[mem.id] = samples;
-      });
+          diagramSamples.push({ s: curX, x: curX, y: 0, N, V, M, defl: 0 });
+        });
+      }
 
       state.extremes.maxN = globalMaxN;
       state.extremes.maxV = globalMaxV;
@@ -1094,12 +1177,10 @@
           const govAxis = (govPcr === pcr_y) ? "Minor Axis (Iy)" : "Major Axis (Ix)";
 
           let maxCompression = 0;
-          Object.values(memberSamples).forEach(samples => {
-            samples.forEach(pt => {
-              if (pt.N < -0.01 && Math.abs(pt.N) > maxCompression) {
-                maxCompression = Math.abs(pt.N);
-              }
-            });
+          diagramSamples.forEach(pt => {
+            if (pt.N < -0.01 && Math.abs(pt.N) > maxCompression) {
+              maxCompression = Math.abs(pt.N);
+            }
           });
 
           if (maxCompression > 0.05) {
@@ -1115,10 +1196,7 @@
         document.getElementById("val-gov-pcr").textContent = "Provide E & I";
       }
 
-      const firstMemId = state.members[0] ? state.members[0].id : null;
-      const samples = firstMemId ? memberSamples[firstMemId] : null;
-
-      if (!E_val || !Ix_val || !samples || samples.length < 3) {
+      if (!E_val || !Ix_val || diagramSamples.length < 3) {
         document.getElementById("val-max-delta").textContent = "Provide E & Ix";
         return;
       }
@@ -1128,37 +1206,43 @@
       const EI = E_Pa * I_m4;
 
       let slope = 0, defl = 0;
-      const dx = samples[1].s - samples[0].s;
       const slopes = [0];
 
-      for (let i = 1; i < samples.length; i++) {
-        const M_avg = (samples[i - 1].M + samples[i].M) / 2 * 1000;
-        slope += (M_avg / EI) * dx;
+      for (let i = 1; i < diagramSamples.length; i++) {
+        const ds = diagramSamples[i].s - diagramSamples[i - 1].s;
+        const M_avg = (diagramSamples[i - 1].M + diagramSamples[i].M) / 2 * 1000;
+        slope += (M_avg / EI) * ds;
         slopes.push(slope);
       }
 
       const rawDefls = [0];
-      for (let i = 1; i < samples.length; i++) {
-        defl += ((slopes[i - 1] + slopes[i]) / 2) * dx;
+      for (let i = 1; i < diagramSamples.length; i++) {
+        const ds = diagramSamples[i].s - diagramSamples[i - 1].s;
+        defl += ((slopes[i - 1] + slopes[i]) / 2) * ds;
         rawDefls.push(defl);
       }
 
       const fixedSupport = state.nodes.find(n => n.support === "fixed");
+      const supNodes = state.nodes.filter(n => n.support !== "none");
       let c1 = 0, c2 = 0;
 
       if (fixedSupport) {
-        c1 = -slopes[0];
-        c2 = -rawDefls[0];
-      } else if (state.nodes.filter(n => n.support !== "none").length >= 2) {
-        const span = samples[samples.length - 1].s - samples[0].s;
-        if (span > 0) {
-          c1 = -(rawDefls[samples.length - 1] - rawDefls[0]) / span;
-          c2 = -rawDefls[0];
+        const idxF = diagramSamples.findIndex(p => Math.abs(p.s - fixedSupport.x) < 0.05);
+        const validIdx = idxF >= 0 ? idxF : 0;
+        c1 = -slopes[validIdx];
+        c2 = -rawDefls[validIdx] - c1 * diagramSamples[validIdx].s;
+      } else if (supNodes.length >= 2) {
+        const idxA = diagramSamples.findIndex(p => Math.abs(p.s - supNodes[0].x) < 0.05);
+        const idxB = diagramSamples.findIndex(p => Math.abs(p.s - supNodes[1].x) < 0.05);
+        if (idxA >= 0 && idxB >= 0 && idxA !== idxB) {
+          const span = diagramSamples[idxB].s - diagramSamples[idxA].s;
+          c1 = -(rawDefls[idxB] - rawDefls[idxA]) / span;
+          c2 = -rawDefls[idxA] - c1 * diagramSamples[idxA].s;
         }
       }
 
       let maxDelta_mm = 0;
-      samples.forEach((pt, idx) => {
+      diagramSamples.forEach((pt, idx) => {
         const y_m = rawDefls[idx] + c1 * pt.s + c2;
         const y_mm = y_m * 1000;
         pt.defl = y_mm;
@@ -1168,7 +1252,7 @@
       document.getElementById("val-max-delta").textContent = `${maxDelta_mm.toFixed(2)} mm`;
     }
 
-    // --- Canvas Main Rendering Loop ---
+    // --- Main Canvas Render ---
     function render() {
       const rect = container.getBoundingClientRect();
       const w = rect.width;
@@ -1179,7 +1263,7 @@
       const cx = w / 2 + state.view.panX;
       const cy = h / 2 + state.view.panY;
 
-      // 1. Grid
+      // 1. Grid Paper
       const subStep = zoom / 5;
       ctx.lineWidth = 0.5;
       ctx.strokeStyle = "#eef2f6";
@@ -1221,35 +1305,31 @@
       });
 
       // 3. Deflected Shape
-      if (state.options.showDeflection) {
-        Object.values(memberSamples).forEach(samples => {
-          if (samples.length > 2) {
-            ctx.save();
-            ctx.strokeStyle = "#16a34a";
-            ctx.lineWidth = 2.5;
-            ctx.setLineDash([5, 4]);
-            ctx.beginPath();
+      if (state.options.showDeflection && diagramSamples.length > 2) {
+        ctx.save();
+        ctx.strokeStyle = "#16a34a";
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
 
-            const maxDefl = Math.max(...samples.map(p => Math.abs(p.defl))) || 1;
-            const scalePx = 32 / maxDefl;
+        const beamScreenY = worldToScreen(0, 0).y;
+        const maxDefl = Math.max(...diagramSamples.map(p => Math.abs(p.defl))) || 1;
+        const scalePx = 32 / maxDefl;
 
-            samples.forEach((pt, i) => {
-              const baseP = worldToScreen(pt.x, pt.y);
-              const screenX = baseP.x;
-              const screenY = baseP.y - pt.defl * scalePx;
-              if (i === 0) ctx.moveTo(screenX, screenY);
-              else ctx.lineTo(screenX, screenY);
-            });
-            ctx.stroke();
-            ctx.restore();
-          }
+        diagramSamples.forEach((pt, i) => {
+          const screenX = worldToScreen(pt.x, 0).x;
+          const screenY = beamScreenY - pt.defl * scalePx;
+          if (i === 0) ctx.moveTo(screenX, screenY);
+          else ctx.lineTo(screenX, screenY);
         });
+        ctx.stroke();
+        ctx.restore();
       }
 
-      // 4. Dimension Lines
+      // 4. Two-Tier Dimension Lines with All Stations
       drawDimensioning();
 
-      // 5. Diagrams (N, V, M) - Adaptive below or beside
+      // 5. Diagrams (N, V, M) - Clean Spacing
       renderDiagramPlots();
 
       // 6. Supports
@@ -1284,16 +1364,8 @@
 
       // 9. Loads
       state.loads.forEach(ld => {
-        const mem = state.members.find(m => m.id === ld.memberId);
-        if (!mem) return;
-        const n1 = state.nodes.find(n => n.id === mem.node1);
-        const n2 = state.nodes.find(n => n.id === mem.node2);
-        const L = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-
         if (ld.type === "point") {
-          const ratio = L > 0 ? ld.dist / L : 0;
-          const p = worldToScreen(n1.x + (n2.x - n1.x) * ratio, n1.y + (n2.y - n1.y) * ratio);
-
+          const p = worldToScreen(getGlobalLoadPosition(ld).x, getGlobalLoadPosition(ld).y);
           if (ld.fy !== 0) {
             const arrowLen = 50;
             const fromY = ld.fy < 0 ? p.y - arrowLen : p.y + arrowLen;
@@ -1311,11 +1383,12 @@
             ctx.fillText(`${Math.abs(ld.fx)} kN`, fromX + 8, p.y - 8);
           }
         } else if (ld.type === "udl") {
-          const minMembX = Math.min(n1.x, n2.x);
+          const mem = state.members.find(m => m.id === ld.memberId);
+          const minMembX = Math.min(state.nodes.find(n => n.id === mem.node1).x, state.nodes.find(n => n.id === mem.node2).x);
           const startX = minMembX + ld.start;
           const endX = startX + ld.len;
-          const p1 = worldToScreen(startX, n1.y);
-          const p2 = worldToScreen(endX, n2.y);
+          const p1 = worldToScreen(startX, 0);
+          const p2 = worldToScreen(endX, 0);
           const hDist = 30;
 
           ctx.fillStyle = "rgba(220, 38, 38, 0.12)";
@@ -1347,6 +1420,27 @@
       });
     }
 
+    // --- Critical Stations Collector ---
+    function getAllCriticalStations() {
+      const stationsMap = {};
+      state.nodes.forEach(n => { stationsMap[n.x.toFixed(2)] = n.x; });
+      state.loads.forEach(ld => {
+        if (ld.type === "point") {
+          const px = getGlobalLoadPosition(ld).x;
+          stationsMap[px.toFixed(2)] = px;
+        } else if (ld.type === "udl") {
+          const mem = state.members.find(m => m.id === ld.memberId);
+          const minX = Math.min(state.nodes.find(n => n.id === mem.node1).x, state.nodes.find(n => n.id === mem.node2).x);
+          const sX = minX + ld.start;
+          const eX = sX + ld.len;
+          stationsMap[sX.toFixed(2)] = sX;
+          stationsMap[eX.toFixed(2)] = eX;
+        }
+      });
+      return Object.values(stationsMap).sort((a, b) => a - b);
+    }
+
+    // --- Two-Tier Dimensioning Engine (Segments + Total) ---
     function drawDimensioning() {
       if (state.members.length === 0) return;
       const isVertical = isSystemVertical();
@@ -1373,27 +1467,72 @@
         ctx.stroke();
 
         drawDimBadge(`H = ${totalHeight.toFixed(2)}m`, dimX, (yTop + yBottom) / 2);
+
       } else {
         const lowestScreenY = Math.max(...state.nodes.map(n => worldToScreen(n.x, n.y).y));
-        const dimY = lowestScreenY + 44;
-        const xCoords = state.nodes.map(n => n.x).sort((a, b) => a - b);
-        const xStart = worldToScreen(xCoords[0], 0).x;
-        const xEnd = worldToScreen(xCoords[xCoords.length - 1], 0).x;
-        const totalSpan = xCoords[xCoords.length - 1] - xCoords[0];
+        const dimY1 = lowestScreenY + 48; // Tier 1: Segments
+        const dimY2 = dimY1 + 26;          // Tier 2: Total
+
+        const stations = getAllCriticalStations();
+        if (stations.length < 2) { ctx.restore(); return; }
+
+        // Draw Witness Lines & Segment Dimensions
+        for (let i = 0; i < stations.length; i++) {
+          const stX = stations[i];
+          const screenX = worldToScreen(stX, 0).x;
+
+          // Witness Drop Line
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(screenX, lowestScreenY + 8);
+          ctx.lineTo(screenX, dimY2 + 8);
+          ctx.stroke();
+
+          // Slashes
+          ctx.setLineDash([]);
+          ctx.strokeStyle = "#334155";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(screenX - 4, dimY1 + 4); ctx.lineTo(screenX + 4, dimY1 - 4);
+          ctx.stroke();
+
+          // Segment Line
+          if (i < stations.length - 1) {
+            const nextX = stations[i + 1];
+            const nextScreenX = worldToScreen(nextX, 0).x;
+            const segLen = nextX - stX;
+
+            if (segLen > 0.05) {
+              ctx.beginPath();
+              ctx.moveTo(screenX, dimY1);
+              ctx.lineTo(nextScreenX, dimY1);
+              ctx.stroke();
+
+              drawDimBadge(`${segLen.toFixed(2)}m`, (screenX + nextScreenX) / 2, dimY1);
+            }
+          }
+        }
+
+        // Draw Tier 2: Total Span Line
+        const firstX = worldToScreen(stations[0], 0).x;
+        const lastX = worldToScreen(stations[stations.length - 1], 0).x;
+        const totalSpan = stations[stations.length - 1] - stations[0];
 
         ctx.strokeStyle = "#334155";
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(xStart, dimY);
-        ctx.lineTo(xEnd, dimY);
+        ctx.moveTo(firstX, dimY2);
+        ctx.lineTo(lastX, dimY2);
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.moveTo(xStart - 5, dimY + 5); ctx.lineTo(xStart + 5, dimY - 5);
-        ctx.moveTo(xEnd - 5, dimY + 5); ctx.lineTo(xEnd + 5, dimY - 5);
+        ctx.moveTo(firstX - 5, dimY2 + 5); ctx.lineTo(firstX + 5, dimY2 - 5);
+        ctx.moveTo(lastX - 5, dimY2 + 5); ctx.lineTo(lastX + 5, dimY2 - 5);
         ctx.stroke();
 
-        drawDimBadge(`L = ${totalSpan.toFixed(2)}m`, (xStart + xEnd) / 2, dimY);
+        drawDimBadge(`Total: ${totalSpan.toFixed(2)}m`, (firstX + lastX) / 2, dimY2);
       }
       ctx.restore();
     }
@@ -1411,6 +1550,7 @@
       ctx.restore();
     }
 
+    // --- Support Reactions Drawn on Geometry ---
     function renderReactionsOnGeometry() {
       const REACTION_COLOR = "#7c3aed";
       const keys = Object.keys(state.reactions);
@@ -1609,11 +1749,9 @@
       ctx.restore();
     }
 
-    // --- Diagram Plots Engine (Adaptive: Below for Beams, Beside for Columns) ---
+    // --- Diagram Plots Engine (Proper Spacing & Conventions) ---
     function renderDiagramPlots() {
-      const allSamples = Object.values(memberSamples).flat();
-      if (allSamples.length < 2) return;
-
+      if (diagramSamples.length < 2) return;
       const isVertical = isSystemVertical();
       const laneHeight = 45;
       const laneGap = 65;
@@ -1623,9 +1761,8 @@
         const rightmostX = Math.max(...state.nodes.map(n => worldToScreen(n.x, n.y).x));
         let currentBaseX = rightmostX + 85;
 
-        const yCoords = state.nodes.map(n => n.y).sort((a, b) => a - b);
-        const pStart = { x: currentBaseX, y: worldToScreen(0, yCoords[0]).y }; // Bottom
-        const pEnd = { x: currentBaseX, y: worldToScreen(0, yCoords[yCoords.length - 1]).y }; // Top
+        const pStart = { x: currentBaseX, y: worldToScreen(0, diagramSamples[0].s).y };
+        const pEnd = { x: currentBaseX, y: worldToScreen(0, diagramSamples[diagramSamples.length - 1].s).y };
 
         function drawVerticalBaseline(baseX, title, signRight, signLeft, color) {
           ctx.save();
@@ -1651,7 +1788,7 @@
           ctx.restore();
         }
 
-        // 1. Axial N (Vertical)
+        // Axial N (Vertical)
         if (state.options.showN) {
           const scaleN = state.extremes.maxN > 0 ? (laneHeight / state.extremes.maxN) : 1;
           drawVerticalBaseline(currentBaseX, `N (Axial) [Max: ${state.extremes.maxN.toFixed(1)} kN]`, "(+)", "(−)", "#d97706");
@@ -1662,92 +1799,34 @@
             ctx.strokeStyle = "#d97706";
             ctx.lineWidth = 1.8;
 
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(currentBaseX, pStart.y);
-              samples.forEach(pt => {
-                const py = worldToScreen(0, pt.y).y;
-                ctx.lineTo(currentBaseX + pt.N * scaleN, py);
-              });
-              ctx.lineTo(currentBaseX, pEnd.y);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-
-              const midSample = samples[Math.floor(samples.length / 2)];
-              const midY = worldToScreen(0, midSample.y).y;
-              const valX = currentBaseX + midSample.N * scaleN;
-              drawBadge(`${midSample.N.toFixed(1)} kN`, valX - 30, midY, "#d97706");
+            ctx.beginPath();
+            ctx.moveTo(currentBaseX, pStart.y);
+            diagramSamples.forEach(pt => {
+              const py = worldToScreen(0, pt.s).y;
+              ctx.lineTo(currentBaseX + pt.N * scaleN, py);
             });
+            ctx.lineTo(currentBaseX, pEnd.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            const midSample = diagramSamples[Math.floor(diagramSamples.length / 2)];
+            const midY = worldToScreen(0, midSample.s).y;
+            const valX = currentBaseX + midSample.N * scaleN;
+            drawBadge(`${midSample.N.toFixed(1)} kN`, valX - 30, midY, "#d97706");
             ctx.restore();
           }
           currentBaseX += (laneHeight * 2 + laneGap);
-        }
-
-        // 2. Shear V (Vertical)
-        if (state.options.showV) {
-          const scaleV = state.extremes.maxV > 0 ? (laneHeight / state.extremes.maxV) : 1;
-          drawVerticalBaseline(currentBaseX, `V (Shear) [Max: ${state.extremes.maxV.toFixed(1)} kN]`, "(+)", "(−)", "#2563eb");
-
-          if (state.extremes.maxV > 0) {
-            ctx.save();
-            ctx.fillStyle = "rgba(37, 99, 235, 0.16)";
-            ctx.strokeStyle = "#2563eb";
-            ctx.lineWidth = 1.8;
-
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(currentBaseX, pStart.y);
-              samples.forEach(pt => {
-                const py = worldToScreen(0, pt.y).y;
-                ctx.lineTo(currentBaseX + pt.V * scaleV, py);
-              });
-              ctx.lineTo(currentBaseX, pEnd.y);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-            });
-            ctx.restore();
-          }
-          currentBaseX += (laneHeight * 2 + laneGap);
-        }
-
-        // 3. Moment M (Vertical)
-        if (state.options.showM) {
-          const scaleM = state.extremes.maxM > 0 ? (laneHeight / state.extremes.maxM) : 1;
-          drawVerticalBaseline(currentBaseX, `M (Moment) [Max: ${state.extremes.maxM.toFixed(1)} kNm]`, "(+)", "(−)", "#7c3aed");
-
-          if (state.extremes.maxM > 0) {
-            ctx.save();
-            ctx.fillStyle = "rgba(124, 58, 237, 0.16)";
-            ctx.strokeStyle = "#7c3aed";
-            ctx.lineWidth = 1.8;
-
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(currentBaseX, pStart.y);
-              samples.forEach(pt => {
-                const py = worldToScreen(0, pt.y).y;
-                ctx.lineTo(currentBaseX + pt.M * scaleM, py);
-              });
-              ctx.lineTo(currentBaseX, pEnd.y);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-            });
-            ctx.restore();
-          }
         }
 
       } else {
         // ================= BEAM MODE: HORIZONTAL DIAGRAMS =================
-        // DYNAMIC BASELINE: Anchored right below the actual lowest node of the system
+        // DYNAMIC POSITION: Clear of the lowest element AND dimension lines
         const lowestScreenY = Math.max(...state.nodes.map(n => worldToScreen(n.x, n.y).y));
-        let currentBaseY = lowestScreenY + 115; // Clearance below beam & dimension lines
+        let currentBaseY = lowestScreenY + 140; // 140px clearance below the beam
 
-        const xCoords = state.nodes.map(n => n.x).sort((a, b) => a - b);
-        const pStart = { x: worldToScreen(xCoords[0], 0).x, y: currentBaseY };
-        const pEnd = { x: worldToScreen(xCoords[xCoords.length - 1], 0).x, y: currentBaseY };
+        const pStart = { x: worldToScreen(diagramSamples[0].s, 0).x, y: currentBaseY };
+        const pEnd = { x: worldToScreen(diagramSamples[diagramSamples.length - 1].s, 0).x, y: currentBaseY };
 
         function drawHorizontalBaseline(baseY, title, signTop, signBottom, color) {
           ctx.save();
@@ -1773,6 +1852,8 @@
           ctx.restore();
         }
 
+        const stations = getAllCriticalStations();
+
         // 1. Axial N
         if (state.options.showN) {
           const scaleN = state.extremes.maxN > 0 ? (laneHeight / state.extremes.maxN) : 1;
@@ -1784,18 +1865,16 @@
             ctx.strokeStyle = "#d97706";
             ctx.lineWidth = 1.8;
 
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(worldToScreen(samples[0].x, 0).x, currentBaseY);
-              samples.forEach(pt => {
-                const px = worldToScreen(pt.x, 0).x;
-                ctx.lineTo(px, currentBaseY - pt.N * scaleN);
-              });
-              ctx.lineTo(worldToScreen(samples[samples.length - 1].x, 0).x, currentBaseY);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(pStart.x, currentBaseY);
+            diagramSamples.forEach(pt => {
+              const px = worldToScreen(pt.s, 0).x;
+              ctx.lineTo(px, currentBaseY - pt.N * scaleN);
             });
+            ctx.lineTo(pEnd.x, currentBaseY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
             ctx.restore();
           }
           currentBaseY += (laneHeight * 2 + laneGap);
@@ -1812,35 +1891,42 @@
             ctx.strokeStyle = "#2563eb";
             ctx.lineWidth = 1.8;
 
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(worldToScreen(samples[0].x, 0).x, currentBaseY);
-              samples.forEach(pt => {
-                const px = worldToScreen(pt.x, 0).x;
-                ctx.lineTo(px, currentBaseY - pt.V * scaleV);
-              });
-              ctx.lineTo(worldToScreen(samples[samples.length - 1].x, 0).x, currentBaseY);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-
-              // Mark Critical Points on V
-              const stations = [samples[0], samples[Math.floor(samples.length / 2)], samples[samples.length - 1]];
-              stations.forEach(st => {
-                const px = worldToScreen(st.x, 0).x;
-                const py = currentBaseY - st.V * scaleV;
-                drawDiscontinuityBadge(`${st.V.toFixed(1)}`, px, py, "#2563eb", st.V >= 0);
-              });
+            ctx.beginPath();
+            ctx.moveTo(pStart.x, currentBaseY);
+            diagramSamples.forEach(pt => {
+              const px = worldToScreen(pt.s, 0).x;
+              ctx.lineTo(px, currentBaseY - pt.V * scaleV);
             });
+            ctx.lineTo(pEnd.x, currentBaseY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
             ctx.restore();
+
+            // Mark Step Jumps and Discontinuities on V
+            stations.forEach(stX => {
+              const screenX = worldToScreen(stX, 0).x;
+              const idxBefore = diagramSamples.findLastIndex(p => p.s < stX);
+              const idxAfter = diagramSamples.findIndex(p => p.s > stX);
+
+              const vBefore = idxBefore >= 0 ? diagramSamples[idxBefore].V : 0;
+              const vAfter = idxAfter >= 0 ? diagramSamples[idxAfter].V : 0;
+
+              if (Math.abs(vAfter - vBefore) > 0.5) {
+                drawDiscontinuityBadge(`${vBefore.toFixed(1)}`, screenX, currentBaseY - vBefore * scaleV, "#2563eb", vBefore >= 0);
+                drawDiscontinuityBadge(`${vAfter.toFixed(1)}`, screenX, currentBaseY - vAfter * scaleV, "#2563eb", vAfter >= 0);
+              } else {
+                const val = idxBefore >= 0 ? diagramSamples[idxBefore].V : 0;
+                drawDiscontinuityBadge(`${val.toFixed(1)}`, screenX, currentBaseY - val * scaleV, "#2563eb", val >= 0);
+              }
+            });
           }
           currentBaseY += (laneHeight * 2 + laneGap);
         }
 
-        // 3. Moment M - Tension Side
+        // 3. Moment M - Tension Side (Below 0 is +, Above 0 is -)
         if (state.options.showM) {
           const scaleM = state.extremes.maxM > 0 ? (laneHeight / state.extremes.maxM) : 1;
-          // BELOW line is positive (+)
           drawHorizontalBaseline(currentBaseY, `M-Diagram (Bending Moment) [Max: ${state.extremes.maxM.toFixed(1)} kNm]`, "(−)", "(+)", "#7c3aed");
 
           if (state.extremes.maxM > 0) {
@@ -1849,25 +1935,28 @@
             ctx.strokeStyle = "#7c3aed";
             ctx.lineWidth = 1.8;
 
-            Object.values(memberSamples).forEach(samples => {
-              ctx.beginPath();
-              ctx.moveTo(worldToScreen(samples[0].x, 0).x, currentBaseY);
-              samples.forEach(pt => {
-                const px = worldToScreen(pt.x, 0).x;
-                ctx.lineTo(px, currentBaseY + pt.M * scaleM);
-              });
-              ctx.lineTo(worldToScreen(samples[samples.length - 1].x, 0).x, currentBaseY);
-              ctx.closePath();
-              ctx.fill();
-              ctx.stroke();
-
-              // Mark Peak Moment & End Stations
-              const maxSample = samples.reduce((prev, curr) => Math.abs(curr.M) > Math.abs(prev.M) ? curr : prev, samples[0]);
-              const px = worldToScreen(maxSample.x, 0).x;
-              const py = currentBaseY + maxSample.M * scaleM;
-              drawDiscontinuityBadge(`${maxSample.M.toFixed(1)}`, px, py, "#7c3aed", maxSample.M <= 0);
+            ctx.beginPath();
+            ctx.moveTo(pStart.x, currentBaseY);
+            diagramSamples.forEach(pt => {
+              const px = worldToScreen(pt.s, 0).x;
+              // Below is positive: + pt.M * scaleM
+              ctx.lineTo(px, currentBaseY + pt.M * scaleM);
             });
+            ctx.lineTo(pEnd.x, currentBaseY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
             ctx.restore();
+
+            // Mark Station Moments on M
+            stations.forEach(stX => {
+              const screenX = worldToScreen(stX, 0).x;
+              const match = diagramSamples.find(p => Math.abs(p.s - stX) < 0.05);
+              if (match) {
+                const py = currentBaseY + match.M * scaleM;
+                drawDiscontinuityBadge(`${match.M.toFixed(1)}`, screenX, py, "#7c3aed", match.M <= 0);
+              }
+            });
           }
         }
       }
@@ -1971,25 +2060,21 @@
       state.members = [];
       state.loads = [];
       state.reactions = {};
-      memberSamples = {};
+      diagramSamples = [];
       nextNodeId = 1; nextMemberId = 1; nextLoadId = 1;
 
-      const archetypes = ["column_cantilever", "standard_simply", "cantilever_beam", "simple_overhang"];
+      const archetypes = ["simple_overhang", "standard_simply", "cantilever_beam", "column_cantilever"];
       const chosen = archetypes[Math.floor(Math.random() * archetypes.length)];
 
-      if (chosen === "column_cantilever") {
-        const H = 3 + Math.floor(Math.random() * 3);
-        const n1 = addNode(0, 0); n1.support = "fixed";
-        const n2 = addNode(0, H); n2.support = "none";
-        const m = addMember(n1.id, n2.id);
+      if (chosen === "simple_overhang") {
+        const n1 = addNode(-4, 0); n1.support = "pin";
+        const n2 = addNode(2, 0); n2.support = "roller";
+        const n3 = addNode(5, 0); n3.support = "none";
+        const m1 = addMember(n1.id, n2.id);
+        const m2 = addMember(n2.id, n3.id);
 
-        const P_comp = -(20 + Math.floor(Math.random() * 40));
-        state.loads.push({ id: nextLoadId++, type: "point", memberId: m.id, dist: H, fy: P_comp, fx: 0 });
-
-        document.getElementById("mat-e").value = "200";
-        document.getElementById("mat-ix").value = "8000";
-        document.getElementById("mat-iy").value = "2500";
-        document.getElementById("mat-a").value = "45";
+        state.loads.push({ id: nextLoadId++, type: "udl", memberId: m1.id, start: 1, len: 4, w: 12 });
+        state.loads.push({ id: nextLoadId++, type: "point", memberId: m2.id, dist: 3, fy: -25, fx: 0 });
 
       } else if (chosen === "standard_simply") {
         const L = 6 + Math.floor(Math.random() * 4);
@@ -2013,15 +2098,17 @@
         state.loads.push({ id: nextLoadId++, type: "point", memberId: m.id, dist: L, fy: -(15 + Math.floor(Math.random() * 30)), fx: 0 });
         state.loads.push({ id: nextLoadId++, type: "udl", memberId: m.id, start: 0, len: Math.floor(L / 2), w: 8 + Math.floor(Math.random() * 12) });
 
-      } else if (chosen === "simple_overhang") {
-        const n1 = addNode(-4, 0); n1.support = "pin";
-        const n2 = addNode(2, 0); n2.support = "roller";
-        const n3 = addNode(5, 0); n3.support = "none";
-        const m1 = addMember(n1.id, n2.id);
-        const m2 = addMember(n2.id, n3.id);
+      } else if (chosen === "column_cantilever") {
+        const H = 3 + Math.floor(Math.random() * 3);
+        const n1 = addNode(0, 0); n1.support = "fixed";
+        const n2 = addNode(0, H); n2.support = "none";
+        const m = addMember(n1.id, n2.id);
 
-        state.loads.push({ id: nextLoadId++, type: "udl", memberId: m1.id, start: 1, len: 4, w: 12 });
-        state.loads.push({ id: nextLoadId++, type: "point", memberId: m2.id, dist: 3, fy: -25, fx: 0 });
+        state.loads.push({ id: nextLoadId++, type: "point", memberId: m.id, dist: H, fy: -(20 + Math.floor(Math.random() * 40)), fx: 0 });
+        document.getElementById("mat-e").value = "200";
+        document.getElementById("mat-ix").value = "8000";
+        document.getElementById("mat-iy").value = "2500";
+        document.getElementById("mat-a").value = "45";
       }
 
       updateNodeDropdowns();
@@ -2055,7 +2142,7 @@
         else if (state.activeStep === 2) canvasHint.textContent = "Select nodes to connect Members";
         else if (state.activeStep === 3) canvasHint.textContent = "Assign Supports & Internal Hinges";
         else if (state.activeStep === 4) canvasHint.textContent = "Place Point & Partial Distributed Loads";
-        else if (state.activeStep === 5) canvasHint.textContent = "Inspect Support Reactions & Internal Force Diagrams";
+        else if (state.activeStep === 5) canvasHint.textContent = "Inspect Reactions & Internal Force Diagrams";
 
         analyzeSystem();
         render();
@@ -2157,7 +2244,7 @@
     document.getElementById("btn-random").addEventListener("click", generateRandomProblem);
 
     document.getElementById("btn-recenter").addEventListener("click", () => {
-      state.view.panX = 0; state.view.panY = -60; state.view.zoom = 42;
+      state.view.panX = 0; state.view.panY = -80; state.view.zoom = 42;
       labelZoom.textContent = "100%";
       render();
     });
@@ -2178,12 +2265,13 @@
       state.options.snapGrid = e.target.checked;
     });
 
+    // Clean Reset
     document.getElementById("btn-clear-all").addEventListener("click", () => {
       state.nodes = [];
       state.members = [];
       state.loads = [];
       state.reactions = {};
-      memberSamples = {};
+      diagramSamples = [];
       state.extremes = { maxN: 0, maxV: 0, maxM: 0, maxDelta: 0 };
       nextNodeId = 1; nextMemberId = 1; nextLoadId = 1;
 
