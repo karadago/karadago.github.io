@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Three-Hinged Parabolic Arch Solver</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --purple: #7c3aed;
+      --teal: #0d9488;
+      --arch-color: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    /* Workspace Canvas Area */
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Floating Viewport Toolbar */
+    .viewport-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      font-size: 13px;
+      color: var(--text-muted);
+      align-items: center;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .toolbar-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .toolbar-btn:hover { background: #e2e8f0; }
+
+    .toolbar-btn.random {
+      background: #fdf4ff;
+      border-color: #d8b4fe;
+      color: #7e22ce;
+      font-weight: 700;
+    }
+    .toolbar-btn.random:hover { background: #f3e8ff; }
+
+    /* Sidebar Area */
+    #sidebar {
+      width: 470px;
+      min-width: 420px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.03);
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h1 {
+      font-size: 17.5px;
+      font-weight: 700;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Cards */
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 13px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .form-group.full {
+      grid-column: span 2;
+    }
+
+    label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      background: #ffffff;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-solve {
+      background: #7c3aed;
+      color: white;
+      font-size: 14px;
+    }
+    .btn-solve:hover { background: #6d28d9; }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: var(--danger);
+      border: 1px solid #fca5a5;
+    }
+    .btn-danger:hover { background: #fecaca; }
+
+    .item-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    .list-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 6px 10px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+
+    .list-row button {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+    }
+    .list-row button:hover { color: var(--danger); }
+
+    .math-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .math-table td { padding: 4px 0; }
+    .math-table td:nth-child(1) { color: var(--text-muted); width: 55%; }
+    .math-table td:nth-child(2) {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .slider-container input[type="range"] {
+      flex: 1;
+      cursor: pointer;
+      accent-color: #7c3aed;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Canvas Workspace -->
+  <div id="canvas-container">
+    <div class="viewport-overlay">
+      <button class="toolbar-btn random" id="btn-random">🎲 Random Problem</button>
+      <button class="toolbar-btn" id="btn-recenter">Recenter</button>
+      <button class="toolbar-btn" id="btn-zoom-out">−</button>
+      <span id="label-zoom" style="font-weight: 600; min-width: 38px; text-align: center;">100%</span>
+      <button class="toolbar-btn" id="btn-zoom-in">+</button>
+      <button class="toolbar-btn btn-danger" id="btn-clear-all" style="margin-left: 6px;">Clear All</button>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <!-- Sidebar Control Panel -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Three-Hinged Arch Solver</h1>
+      <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 7px; border-radius: 5px; font-weight: 700;">Parabolic</span>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- 1. Geometry Setup -->
+      <div class="card">
+        <span class="card-title">1. Parabolic Arch Geometry</span>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Span L (m)</label>
+            <input type="number" id="arch-span" value="28" min="4" max="80" step="1">
+          </div>
+          <div class="form-group">
+            <label>Crown Rise h (m)</label>
+            <input type="number" id="arch-rise" value="4" min="1" max="40" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>Crown Hinge x<sub>C</sub> (m)</label>
+            <input type="number" id="arch-xc" value="14" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>Support B Elevation y<sub>B</sub> (m)</label>
+            <input type="number" id="arch-yb" value="0" step="0.5">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Loads Setup -->
+      <div class="card">
+        <span class="card-title">2. Add Loads</span>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Point Load at x (m)</label>
+            <input type="number" id="load-p-x" value="7" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>Vertical Force Fy (kN) [− = Down]</label>
+            <input type="number" id="load-p-fy" value="-22" step="1">
+          </div>
+          <div class="form-group full">
+            <button class="btn btn-primary" id="btn-add-point">+ Add Point Load</button>
+          </div>
+        </div>
+
+        <div class="form-grid" style="border-top: 1px dashed #cbd5e1; padding-top: 8px;">
+          <div class="form-group">
+            <label>UDL Start x₁ (m)</label>
+            <input type="number" id="load-udl-x1" value="14" step="0.5">
+          </div>
+          <div class="form-group">
+            <label>UDL End x₂ (m)</label>
+            <input type="number" id="load-udl-x2" value="28" step="0.5">
+          </div>
+          <div class="form-group full">
+            <label>UDL Intensity w (kN/m) [Positive = Downward]</label>
+            <input type="number" id="load-udl-w" value="13" step="1">
+          </div>
+          <div class="form-group full">
+            <button class="btn btn-primary" id="btn-add-udl">+ Add Distributed Load</button>
+          </div>
+        </div>
+
+        <span class="card-title" style="margin-top: 4px;">Applied Loads (<span id="loads-count">0</span>)</span>
+        <div class="item-list" id="loads-list"></div>
+      </div>
+
+      <!-- 3. Solve & Free-Body Separation Slider -->
+      <div class="card">
+        <span class="card-title">3. Structural Solution & FBD Separation</span>
+        <button class="btn btn-solve" id="btn-solve">Solve Support Reactions & Hinge Forces</button>
+
+        <div class="slider-container" style="margin-top: 6px;">
+          <label>FBD Separation (Split by Hinge):</label>
+          <input type="range" id="fbd-gap-slider" min="0" max="120" value="0">
+          <span id="label-fbd-gap" style="min-width: 36px; text-align: right;">0px</span>
+        </div>
+        <span style="font-size: 11px; color: var(--text-muted); font-style: italic;">
+          *Slide to pull the arch sections apart and reveal the internal action-reaction force pair at crown C.
+        </span>
+      </div>
+
+      <!-- 4. Solution Math Summary -->
+      <div class="card" id="card-results" style="display: none;">
+        <span class="card-title">Support Reactions & Hinge Values</span>
+        <table class="math-table">
+          <tr>
+            <td>Reaction A<sub>x</sub> (Support A):</td>
+            <td id="res-ax" style="color:var(--purple);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Reaction A<sub>y</sub> (Support A):</td>
+            <td id="res-ay" style="color:var(--purple);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Reaction B<sub>x</sub> (Support B):</td>
+            <td id="res-bx" style="color:var(--purple);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Reaction B<sub>y</sub> (Support B):</td>
+            <td id="res-by" style="color:var(--purple);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Internal Hinge Force C<sub>x</sub>:</td>
+            <td id="res-cx" style="color:var(--teal);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Internal Hinge Force C<sub>y</sub>:</td>
+            <td id="res-cy" style="color:var(--teal);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Resultant Hinge Thrust |C|:</td>
+            <td id="res-c-mag" style="color:var(--teal); font-weight:800;">0.00 kN</td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let state = {
+      span: 28,
+      rise: 4,
+      xC: 14,
+      yB: 0,
+      loads: [],
+      fbdGap: 0,
+      solved: false,
+      solution: {
+        Ax: 0, Ay: 0,
+        Bx: 0, By: 0,
+        Cx: 0, Cy: 0,
+        C_mag: 0
+      },
+      view: { panX: 0, panY: 0, zoom: 30 }
+    };
+
+    let nextLoadId = 1;
+
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
+
+    const inputSpan = document.getElementById("arch-span");
+    const inputRise = document.getElementById("arch-rise");
+    const inputXC = document.getElementById("arch-xc");
+    const inputYB = document.getElementById("arch-yb");
+
+    const inputPx = document.getElementById("load-p-x");
+    const inputPfy = document.getElementById("load-p-fy");
+    const inputUdlX1 = document.getElementById("load-udl-x1");
+    const inputUdlX2 = document.getElementById("load-udl-x2");
+    const inputUdlW = document.getElementById("load-udl-w");
+
+    const fbdGapSlider = document.getElementById("fbd-gap-slider");
+    const labelFbdGap = document.getElementById("label-fbd-gap");
+    const cardResults = document.getElementById("card-results");
+    const loadsCount = document.getElementById("loads-count");
+    const loadsList = document.getElementById("loads-list");
+    const labelZoom = document.getElementById("label-zoom");
+
+    function worldToScreen(wx, wy) {
+      const rect = container.getBoundingClientRect();
+      const originX = rect.width / 2 + state.view.panX - (state.span * state.view.zoom) / 2;
+      const originY = rect.height / 2 + state.view.panY + (state.rise * state.view.zoom) / 2;
+      return {
+        x: originX + wx * state.view.zoom,
+        y: originY - wy * state.view.zoom
+      };
+    }
+
+    function screenToWorld(sx, sy) {
+      const rect = container.getBoundingClientRect();
+      const originX = rect.width / 2 + state.view.panX - (state.span * state.view.zoom) / 2;
+      const originY = rect.height / 2 + state.view.panY + (state.rise * state.view.zoom) / 2;
+      return {
+        x: (sx - originX) / state.view.zoom,
+        y: -(sy - originY) / state.view.zoom
+      };
+    }
+
+    function getArchElevation(x) {
+      const L = state.span;
+      const h = state.rise;
+      const xC = state.xC;
+      const yB = state.yB;
+
+      if (Math.abs(yB) < 1e-4 && Math.abs(xC - L / 2) < 1e-4) {
+        return (4 * h * x * (L - x)) / (L * L);
+      }
+      const a = (h - yB * (xC / L)) / (xC * (xC - L));
+      const b = yB / L - a * L;
+      return a * x * x + b * x;
+    }
+
+    function solveArch() {
+      const L = state.span;
+      const yB = state.yB;
+      const xC = state.xC;
+      const yC = getArchElevation(xC);
+
+      let sumFx = 0;
+      let sumFy = 0;
+      let sumMO_A = 0;
+      let sumMO_C_left = 0;
+
+      state.loads.forEach(ld => {
+        if (ld.type === "point") {
+          const px = ld.x;
+          const py = getArchElevation(px);
+          sumFx += ld.fx;
+          sumFy += ld.fy;
+          sumMO_A += (px * ld.fy - py * ld.fx);
+
+          if (px <= xC) {
+            sumMO_C_left += ((px - xC) * ld.fy - (py - yC) * ld.fx);
+          }
+
+        } else if (ld.type === "udl") {
+          const spanW = Math.max(0, ld.x2 - ld.x1);
+          const totalW = -ld.w * spanW;
+          const centroidX = (ld.x1 + ld.x2) / 2;
+          sumFy += totalW;
+          sumMO_A += (centroidX * totalW);
+
+          if (ld.x1 < xC) {
+            const leftEnd = Math.min(xC, ld.x2);
+            const leftLen = leftEnd - ld.x1;
+            const leftTotalW = -ld.w * leftLen;
+            const leftCentroidX = (ld.x1 + leftEnd) / 2;
+            sumMO_C_left += ((leftCentroidX - xC) * leftTotalW);
+          }
+        }
+      });
+
+      const A = [
+        [1, 0, 1, 0],
+        [0, 1, 0, 1],
+        [0, 0, -yB, L],
+        [yC, -xC, 0, 0]
+      ];
+      const B = [
+        -sumFx,
+        -sumFy,
+        -sumMO_A,
+        -sumMO_C_left
+      ];
+
+      const sol = solve4x4(A, B);
+      if (!sol) return;
+
+      const Ax = sol[0];
+      const Ay = sol[1];
+      const Bx = sol[2];
+      const By = sol[3];
+
+      let sumFx_left_loads = 0;
+      let sumFy_left_loads = 0;
+
+      state.loads.forEach(ld => {
+        if (ld.type === "point" && ld.x <= xC) {
+          sumFx_left_loads += ld.fx;
+          sumFy_left_loads += ld.fy;
+        } else if (ld.type === "udl" && ld.x1 < xC) {
+          const leftEnd = Math.min(xC, ld.x2);
+          const leftLen = leftEnd - ld.x1;
+          sumFy_left_loads += (-ld.w * leftLen);
+        }
+      });
+
+      const Cx = Ax + sumFx_left_loads;
+      const Cy = Ay + sumFy_left_loads;
+      const C_mag = Math.hypot(Cx, Cy);
+
+      state.solution = { Ax, Ay, Bx, By, Cx, Cy, C_mag };
+      state.solved = true;
+
+      document.getElementById("res-ax").textContent = `${Ax >= 0 ? '+' : ''}${Ax.toFixed(2)} kN`;
+      document.getElementById("res-ay").textContent = `${Ay >= 0 ? '+' : ''}${Ay.toFixed(2)} kN`;
+      document.getElementById("res-bx").textContent = `${Bx >= 0 ? '+' : ''}${Bx.toFixed(2)} kN`;
+      document.getElementById("res-by").textContent = `${By >= 0 ? '+' : ''}${By.toFixed(2)} kN`;
+      document.getElementById("res-cx").textContent = `${Cx >= 0 ? '+' : ''}${Cx.toFixed(2)} kN`;
+      document.getElementById("res-cy").textContent = `${Cy >= 0 ? '+' : ''}${Cy.toFixed(2)} kN`;
+      document.getElementById("res-c-mag").textContent = `${C_mag.toFixed(2)} kN`;
+
+      cardResults.style.display = "flex";
+      render();
+    }
+
+    function solve4x4(A, b) {
+      const n = 4;
+      for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+        }
+        [A[i], A[maxRow]] = [A[maxRow], A[i]];
+        [b[i], b[maxRow]] = [b[maxRow], b[i]];
+
+        if (Math.abs(A[i][i]) < 1e-9) return null;
+
+        for (let k = i + 1; k < n; k++) {
+          const factor = A[k][i] / A[i][i];
+          for (let j = i; j < n; j++) A[k][j] -= factor * A[i][j];
+          b[k] -= factor * b[i];
+        }
+      }
+      const x = new Array(n).fill(0);
+      for (let i = n - 1; i >= 0; i--) {
+        let sum = b[i];
+        for (let j = i + 1; j < n; j++) sum -= A[i][j] * x[j];
+        x[i] = sum / A[i][i];
+      }
+      return x;
+    }
+
+    function render() {
+      const rect = container.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const zoom = state.view.zoom;
+      const cx = w / 2 + state.view.panX;
+      const cy = h / 2 + state.view.panY;
+
+      // 1. Grid
+      const subStep = zoom / 5;
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "#eef2f6";
+      ctx.beginPath();
+      for (let x = cx % subStep; x < w; x += subStep) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = cy % subStep; y < h; y += subStep) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.beginPath();
+      for (let x = cx % zoom; x < w; x += zoom) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = cy % zoom; y < h; y += zoom) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      const L = state.span;
+      const xC = state.xC;
+      const yB = state.yB;
+      const yC = getArchElevation(xC);
+      const gap = state.fbdGap;
+
+      // 2. Render Left Body (AC)
+      ctx.save();
+      ctx.translate(-gap, 0);
+      drawArchSegment(0, xC);
+      drawPinSupport(0, 0, "A");
+
+      if (state.solved) {
+        drawReactionsAtA(0, 0);
+        drawHingeActionOnLeft(xC, yC);
+      }
+      drawLoadsOnSegment(0, xC);
+      ctx.restore();
+
+      // 3. Render Right Body (CB)
+      ctx.save();
+      ctx.translate(gap, 0);
+      drawArchSegment(xC, L);
+      drawPinSupport(L, yB, "B");
+
+      if (state.solved) {
+        drawReactionsAtB(L, yB);
+        drawHingeActionOnRight(xC, yC);
+      }
+      drawLoadsOnSegment(xC, L);
+      ctx.restore();
+
+      // 4. Two-Tier Dimensions with Exact Projections
+      drawDimensioning();
+    }
+
+    function drawArchSegment(xStart, xEnd) {
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 7;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.beginPath();
+
+      const steps = 70;
+      for (let i = 0; i <= steps; i++) {
+        const x = xStart + (i / steps) * (xEnd - xStart);
+        const y = getArchElevation(x);
+        const p = worldToScreen(x, y);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      const pEnd = worldToScreen(xEnd, getArchElevation(xEnd));
+      ctx.beginPath();
+      ctx.arc(pEnd.x, pEnd.y, 7.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    function drawPinSupport(wx, wy, label) {
+      const p = worldToScreen(wx, wy);
+      ctx.save();
+
+      ctx.fillStyle = "#64748b";
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - 14, p.y + 22);
+      ctx.lineTo(p.x + 14, p.y + 22);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 18, p.y + 23);
+      ctx.lineTo(p.x + 18, p.y + 23);
+      ctx.stroke();
+
+      ctx.lineWidth = 1;
+      for (let i = -14; i <= 14; i += 7) {
+        ctx.beginPath();
+        ctx.moveTo(p.x + i, p.y + 23);
+        ctx.lineTo(p.x + i - 6, p.y + 29);
+        ctx.stroke();
+      }
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = "#0f172a";
+      ctx.font = "bold 13px sans-serif";
+      ctx.fillText(label, p.x - 26, p.y + 6);
+      ctx.restore();
+    }
+
+    function drawReactionsAtA(wx, wy) {
+      const p = worldToScreen(wx, wy);
+      const { Ax, Ay } = state.solution;
+      const col = "#7c3aed";
+
+      if (Math.abs(Ay) > 0.05) {
+        const len = 50;
+        if (Ay > 0) {
+          drawArrow(p.x, p.y + len + 18, p.x, p.y + 8, col, 3.2, 12);
+          drawBadge(`Ay = +${Ay.toFixed(2)} kN`, p.x, p.y + len + 30, col);
+        } else {
+          drawArrow(p.x, p.y + 8, p.x, p.y + len + 18, col, 3.2, 12);
+          drawBadge(`Ay = ${Ay.toFixed(2)} kN`, p.x, p.y + len + 30, col);
+        }
+      }
+
+      if (Math.abs(Ax) > 0.05) {
+        const len = 50;
+        if (Ax > 0) {
+          drawArrow(p.x - len - 14, p.y, p.x - 6, p.y, col, 3.2, 12);
+          drawBadge(`Ax = +${Ax.toFixed(2)} kN`, p.x - len - 48, p.y - 12, col);
+        } else {
+          drawArrow(p.x + len + 14, p.y, p.x + 6, p.y, col, 3.2, 12);
+          drawBadge(`Ax = ${Ax.toFixed(2)} kN`, p.x + len + 48, p.y - 12, col);
+        }
+      }
+    }
+
+    function drawReactionsAtB(wx, wy) {
+      const p = worldToScreen(wx, wy);
+      const { Bx, By } = state.solution;
+      const col = "#7c3aed";
+
+      if (Math.abs(By) > 0.05) {
+        const len = 50;
+        if (By > 0) {
+          drawArrow(p.x, p.y + len + 18, p.x, p.y + 8, col, 3.2, 12);
+          drawBadge(`By = +${By.toFixed(2)} kN`, p.x, p.y + len + 30, col);
+        } else {
+          drawArrow(p.x, p.y + 8, p.x, p.y + len + 18, col, 3.2, 12);
+          drawBadge(`By = ${By.toFixed(2)} kN`, p.x, p.y + len + 30, col);
+        }
+      }
+
+      if (Math.abs(Bx) > 0.05) {
+        const len = 50;
+        if (Bx > 0) {
+          drawArrow(p.x - len - 14, p.y, p.x - 6, p.y, col, 3.2, 12);
+          drawBadge(`Bx = +${Bx.toFixed(2)} kN`, p.x - len - 48, p.y - 12, col);
+        } else {
+          drawArrow(p.x + len + 14, p.y, p.x + 6, p.y, col, 3.2, 12);
+          drawBadge(`Bx = ${Bx.toFixed(2)} kN`, p.x + len + 48, p.y - 12, col);
+        }
+      }
+    }
+
+    // --- High-Readability Internal Hinge Force Display at C ---
+    function drawHingeActionOnLeft(wx, wy) {
+      const p = worldToScreen(wx, wy);
+      const { Cx, Cy } = state.solution;
+      const col = "#0d9488";
+      const len = 44;
+
+      drawBadge("Left Section AC", p.x - 60, p.y - 50, "#334155");
+
+      // Action ON Left Body: -Cx, -Cy
+      // Horizontal Thrust
+      if (Math.abs(Cx) > 0.05) {
+        const arrowY = p.y - 14;
+        if (-Cx > 0) {
+          // Points Right (emerging toward gap)
+          drawArrow(p.x + 6, arrowY, p.x + len + 6, arrowY, col, 3, 10);
+          drawBadge(`Cx = ${Math.abs(Cx).toFixed(2)} kN (→)`, p.x + len + 62, arrowY, col);
+        } else {
+          // Points Left (into left body)
+          drawArrow(p.x - 6, arrowY, p.x - len - 6, arrowY, col, 3, 10);
+          drawBadge(`Cx = ${Math.abs(Cx).toFixed(2)} kN (←)`, p.x - len - 62, arrowY, col);
+        }
+      }
+
+      // Vertical Shear
+      if (Math.abs(Cy) > 0.05) {
+        const arrowX = p.x - 18;
+        if (-Cy > 0) {
+          // Points Up
+          drawArrow(arrowX, p.y + len, arrowX, p.y + 6, col, 3, 10);
+          drawBadge(`Cy = ${Math.abs(Cy).toFixed(2)} kN (↑)`, arrowX - 10, p.y + len + 20, col);
+        } else {
+          // Points Down
+          drawArrow(arrowX, p.y + 6, arrowX, p.y + len, col, 3, 10);
+          drawBadge(`Cy = ${Math.abs(Cy).toFixed(2)} kN (↓)`, arrowX - 10, p.y + len + 20, col);
+        }
+      }
+    }
+
+    function drawHingeActionOnRight(wx, wy) {
+      const p = worldToScreen(wx, wy);
+      const { Cx, Cy } = state.solution;
+      const col = "#0d9488";
+      const len = 44;
+
+      drawBadge("Right Section CB", p.x + 60, p.y - 50, "#334155");
+
+      // Action ON Right Body: +Cx, +Cy (Equal & Opposite!)
+      // Horizontal Thrust
+      if (Math.abs(Cx) > 0.05) {
+        const arrowY = p.y - 14;
+        if (Cx > 0) {
+          // Points Right (into right body)
+          drawArrow(p.x + 6, arrowY, p.x + len + 6, arrowY, col, 3, 10);
+          drawBadge(`Cx = ${Math.abs(Cx).toFixed(2)} kN (→)`, p.x + len + 62, arrowY, col);
+        } else {
+          // Points Left (emerging toward gap)
+          drawArrow(p.x - 6, arrowY, p.x - len - 6, arrowY, col, 3, 10);
+          drawBadge(`Cx = ${Math.abs(Cx).toFixed(2)} kN (←)`, p.x - len - 62, arrowY, col);
+        }
+      }
+
+      // Vertical Shear
+      if (Math.abs(Cy) > 0.05) {
+        const arrowX = p.x + 18;
+        if (Cy > 0) {
+          // Points Up
+          drawArrow(arrowX, p.y + len, arrowX, p.y + 6, col, 3, 10);
+          drawBadge(`Cy = ${Math.abs(Cy).toFixed(2)} kN (↑)`, arrowX + 10, p.y + len + 20, col);
+        } else {
+          // Points Down
+          drawArrow(arrowX, p.y + 6, arrowX, p.y + len, col, 3, 10);
+          drawBadge(`Cy = ${Math.abs(Cy).toFixed(2)} kN (↓)`, arrowX + 10, p.y + len + 20, col);
+        }
+      }
+    }
+
+    function drawLoadsOnSegment(xStart, xEnd) {
+      state.loads.forEach(ld => {
+        if (ld.type === "point") {
+          if (ld.x >= xStart && ld.x <= xEnd) {
+            const p = worldToScreen(ld.x, getArchElevation(ld.x));
+            if (ld.fy !== 0) {
+              const arrowLen = 50;
+              const fromY = ld.fy < 0 ? p.y - arrowLen : p.y + arrowLen;
+              drawArrow(p.x, fromY, p.x, p.y, "#dc2626", 2.8);
+              ctx.fillStyle = "#dc2626";
+              ctx.font = "bold 11.5px sans-serif";
+              ctx.fillText(`${Math.abs(ld.fy)} kN`, p.x + 8, fromY + (ld.fy < 0 ? 15 : -6));
+            }
+          }
+        } else if (ld.type === "udl") {
+          const overlapStart = Math.max(xStart, ld.x1);
+          const overlapEnd = Math.min(xEnd, ld.x2);
+          if (overlapEnd > overlapStart) {
+            const hDist = 30;
+            for (let x = overlapStart + 0.5; x <= overlapEnd; x += 1.8) {
+              const pt = worldToScreen(x, getArchElevation(x));
+              drawArrow(pt.x, pt.y - hDist, pt.x, pt.y, "#dc2626", 1.8);
+            }
+            ctx.fillStyle = "#dc2626";
+            ctx.font = "bold 11px sans-serif";
+            const midP = worldToScreen((overlapStart + overlapEnd) / 2, getArchElevation((overlapStart + overlapEnd) / 2));
+            ctx.fillText(`w = ${ld.w} kN/m`, midP.x - 25, midP.y - hDist - 6);
+          }
+        }
+      });
+    }
+
+    // --- Three-Tier Dimensioning Engine (Segments -> Section Spans -> Master Total Span) ---
+    function drawDimensioning() {
+      const L = state.span;
+      const xC = state.xC;
+      const yB = state.yB;
+      const gap = state.fbdGap;
+
+      const pA = worldToScreen(0, 0);
+      const pB = worldToScreen(L, yB);
+
+      // Three vertical dimensioning tiers below the reaction arrows
+      const baseArchBottomY = Math.max(pA.y, pB.y);
+      const dimY1 = baseArchBottomY + 130; // Tier 1: Segments between loads/stations
+      const dimY2 = dimY1 + 28;            // Tier 2: Section Spans (Span AC & Span CB)
+      const dimY3 = dimY2 + 28;            // Tier 3: Master Total Span (Total L)
+
+      ctx.save();
+
+      // Collect Critical Stations for Left Section (0 <= x <= xC)
+      const leftStationsMap = {};
+      leftStationsMap["0.00"] = 0;
+      leftStationsMap[xC.toFixed(2)] = xC;
+
+      // Collect Critical Stations for Right Section (xC <= x <= L)
+      const rightStationsMap = {};
+      rightStationsMap[xC.toFixed(2)] = xC;
+      rightStationsMap[L.toFixed(2)] = L;
+
+      state.loads.forEach(ld => {
+        if (ld.type === "point") {
+          if (ld.x <= xC) leftStationsMap[ld.x.toFixed(2)] = ld.x;
+          if (ld.x >= xC) rightStationsMap[ld.x.toFixed(2)] = ld.x;
+        } else if (ld.type === "udl") {
+          if (ld.x1 <= xC) leftStationsMap[ld.x1.toFixed(2)] = ld.x1;
+          if (ld.x2 <= xC) leftStationsMap[ld.x2.toFixed(2)] = ld.x2;
+          if (ld.x1 >= xC) rightStationsMap[ld.x1.toFixed(2)] = ld.x1;
+          if (ld.x2 >= xC) rightStationsMap[ld.x2.toFixed(2)] = ld.x2;
+          if (ld.x1 < xC && ld.x2 > xC) {
+            leftStationsMap[xC.toFixed(2)] = xC;
+            rightStationsMap[xC.toFixed(2)] = xC;
+          }
+        }
+      });
+
+      const leftStations = Object.values(leftStationsMap).sort((a, b) => a - b);
+      const rightStations = Object.values(rightStationsMap).sort((a, b) => a - b);
+
+      function drawChain(stations, xOffset, spanLabel) {
+        if (stations.length < 2) return;
+
+        for (let i = 0; i < stations.length; i++) {
+          const stX = stations[i];
+          const ptScreen = worldToScreen(stX, getArchElevation(stX));
+          const screenX = ptScreen.x + xOffset;
+          const archY = ptScreen.y;
+
+          // Dashed witness line dropping directly from the point on the arch down past Tier 2
+          ctx.strokeStyle = "#94a3b8";
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(screenX, archY + 8);
+          ctx.lineTo(screenX, dimY2 + 8);
+          ctx.stroke();
+
+          // Slashes
+          ctx.setLineDash([]);
+          ctx.strokeStyle = "#334155";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(screenX - 4, dimY1 + 4);
+          ctx.lineTo(screenX + 4, dimY1 - 4);
+          ctx.stroke();
+
+          // Segment Line
+          if (i < stations.length - 1) {
+            const nextX = stations[i + 1];
+            const nextScreenX = worldToScreen(nextX, 0).x + xOffset;
+            const segLen = nextX - stX;
+
+            if (segLen > 0.04) {
+              ctx.beginPath();
+              ctx.moveTo(screenX, dimY1);
+              ctx.lineTo(nextScreenX, dimY1);
+              ctx.stroke();
+
+              drawDimBadge(`${segLen.toFixed(2)}m`, (screenX + nextScreenX) / 2, dimY1);
+            }
+          }
+        }
+
+        // Section Span Line (Tier 2)
+        const startX = worldToScreen(stations[0], 0).x + xOffset;
+        const endX = worldToScreen(stations[stations.length - 1], 0).x + xOffset;
+        const totalSpan = stations[stations.length - 1] - stations[0];
+
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(startX, dimY2);
+        ctx.lineTo(endX, dimY2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(startX - 5, dimY2 + 5); ctx.lineTo(startX + 5, dimY2 - 5);
+        ctx.moveTo(endX - 5, dimY2 + 5); ctx.lineTo(endX + 5, dimY2 - 5);
+        ctx.stroke();
+
+        drawDimBadge(spanLabel || `Span = ${totalSpan.toFixed(2)}m`, (startX + endX) / 2, dimY2);
+      }
+
+      if (gap === 0) {
+        const allMap = {};
+        leftStations.forEach(s => allMap[s.toFixed(2)] = s);
+        rightStations.forEach(s => allMap[s.toFixed(2)] = s);
+        const allStations = Object.values(allMap).sort((a, b) => a - b);
+        drawChain(allStations, 0, `Total Span L = ${L.toFixed(2)}m`);
+      } else {
+        // Draw Left Section Chain (offset by -gap)
+        drawChain(leftStations, -gap, `Span AC = ${xC.toFixed(2)}m`);
+        // Draw Right Section Chain (offset by +gap)
+        drawChain(rightStations, gap, `Span CB = ${(L - xC).toFixed(2)}m`);
+
+        // === TIER 3: MASTER TOTAL SPAN (Always present below the split sections) ===
+        const leftTotalX = pA.x - gap;
+        const rightTotalX = pB.x + gap;
+
+        // Long witness drop lines from Supports down to Tier 3
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(leftTotalX, pA.y + 8);
+        ctx.lineTo(leftTotalX, dimY3 + 8);
+        ctx.moveTo(rightTotalX, pB.y + 8);
+        ctx.lineTo(rightTotalX, dimY3 + 8);
+        ctx.stroke();
+
+        // Continuous master line
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "#0f172a";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(leftTotalX, dimY3);
+        ctx.lineTo(rightTotalX, dimY3);
+        ctx.stroke();
+
+        // Terminal 45° slashes
+        ctx.beginPath();
+        ctx.moveTo(leftTotalX - 5, dimY3 + 5); ctx.lineTo(leftTotalX + 5, dimY3 - 5);
+        ctx.moveTo(rightTotalX - 5, dimY3 + 5); ctx.lineTo(rightTotalX + 5, dimY3 - 5);
+        ctx.stroke();
+
+        drawDimBadge(`Total Span L = ${L.toFixed(2)}m`, (leftTotalX + rightTotalX) / 2, dimY3);
+      }
+
+      // Crown Rise dimension
+      const pCrown = worldToScreen(xC, getArchElevation(xC));
+      const pCrownBase = worldToScreen(xC, 0);
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pCrown.x, pCrown.y);
+      ctx.lineTo(pCrown.x, pCrownBase.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      drawDimBadge(`Rise h = ${state.rise.toFixed(2)}m`, pCrown.x, (pCrown.y + pCrownBase.y) / 2);
+
+      ctx.restore();
+    }
+
+    function drawDimBadge(text, x, y) {
+      ctx.save();
+      ctx.font = "bold 10.5px sans-serif";
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - w / 2, y - 7, w, 14);
+      ctx.fillStyle = "#334155";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    function drawArrow(fromX, fromY, toX, toY, color, width = 2.5, headLen = 10) {
+      const angle = Math.atan2(toY - fromY, toX - fromX);
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBadge(text, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 11px sans-serif";
+      const w = ctx.measureText(text).width + 10;
+      ctx.fillStyle = "rgba(255, 255, 255, 0.98)";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x - w / 2, y - 10, w, 20, 4) : ctx.rect(x - w / 2, y - 10, w, 20);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- UI Controls ---
+    function updateLoadsList() {
+      loadsList.innerHTML = "";
+      loadsCount.textContent = state.loads.length;
+
+      if (state.loads.length === 0) {
+        loadsList.innerHTML = `<div style="font-size: 12px; color: var(--text-muted); font-style: italic;">No loads applied yet.</div>`;
+        return;
+      }
+
+      state.loads.forEach(ld => {
+        const row = document.createElement("div");
+        row.className = "list-row";
+        let desc = ld.type === "point"
+          ? `Point Load: ${Math.abs(ld.fy)} kN at x = ${ld.x}m`
+          : `UDL: ${ld.w} kN/m (x = ${ld.x1}m to ${ld.x2}m)`;
+        row.innerHTML = `
+          <span>${desc}</span>
+          <button title="Remove load" onclick="removeLoad(${ld.id})">&times;</button>
+        `;
+        loadsList.appendChild(row);
+      });
+    }
+
+    window.removeLoad = function(id) {
+      state.loads = state.loads.filter(l => l.id !== id);
+      state.solved = false;
+      cardResults.style.display = "none";
+      updateLoadsList();
+      render();
+    };
+
+    document.getElementById("btn-add-point").addEventListener("click", () => {
+      const px = parseFloat(inputPx.value) || 0;
+      const pfy = parseFloat(inputPfy.value) || -22;
+      state.loads.push({ id: nextLoadId++, type: "point", x: px, fy: pfy, fx: 0 });
+      state.solved = false;
+      cardResults.style.display = "none";
+      updateLoadsList();
+      render();
+    });
+
+    document.getElementById("btn-add-udl").addEventListener("click", () => {
+      const x1 = parseFloat(inputUdlX1.value) || 0;
+      const x2 = parseFloat(inputUdlX2.value) || state.span / 2;
+      const w = parseFloat(inputUdlW.value) || 13;
+      state.loads.push({ id: nextLoadId++, type: "udl", x1, x2, w });
+      state.solved = false;
+      cardResults.style.display = "none";
+      updateLoadsList();
+      render();
+    });
+
+    [inputSpan, inputRise, inputXC, inputYB].forEach(el => {
+      el.addEventListener("input", () => {
+        state.span = parseFloat(inputSpan.value) || 28;
+        state.rise = parseFloat(inputRise.value) || 4;
+        state.xC = parseFloat(inputXC.value) || state.span / 2;
+        state.yB = parseFloat(inputYB.value) || 0;
+        state.solved = false;
+        cardResults.style.display = "none";
+        render();
+      });
+    });
+
+    fbdGapSlider.addEventListener("input", (e) => {
+      state.fbdGap = parseInt(e.target.value) || 0;
+      labelFbdGap.textContent = `${state.fbdGap}px`;
+      render();
+    });
+
+    document.getElementById("btn-solve").addEventListener("click", () => {
+      solveArch();
+      if (state.fbdGap === 0) {
+        state.fbdGap = 60;
+        fbdGapSlider.value = "60";
+        labelFbdGap.textContent = "60px";
+        render();
+      }
+    });
+
+    document.getElementById("btn-random").addEventListener("click", () => {
+      const spans = [20, 24, 28, 32];
+      const rises = [4, 5, 6];
+      state.span = spans[Math.floor(Math.random() * spans.length)];
+      state.rise = rises[Math.floor(Math.random() * rises.length)];
+      state.xC = state.span / 2;
+      state.yB = 0;
+
+      inputSpan.value = state.span;
+      inputRise.value = state.rise;
+      inputXC.value = state.xC;
+      inputYB.value = state.yB;
+
+      state.loads = [];
+      const px = Math.round(state.span * 0.25);
+      state.loads.push({ id: nextLoadId++, type: "point", x: px, fy: -(15 + Math.floor(Math.random() * 25)), fx: 0 });
+      state.loads.push({ id: nextLoadId++, type: "udl", x1: state.span / 2, x2: state.span, w: 10 + Math.floor(Math.random() * 8) });
+
+      updateLoadsList();
+      solveArch();
+      state.fbdGap = 60;
+      fbdGapSlider.value = "60";
+      labelFbdGap.textContent = "60px";
+      render();
+    });
+
+    document.getElementById("btn-clear-all").addEventListener("click", () => {
+      state.loads = [];
+      state.solved = false;
+      state.fbdGap = 0;
+      fbdGapSlider.value = "0";
+      labelFbdGap.textContent = "0px";
+      cardResults.style.display = "none";
+      updateLoadsList();
+      render();
+    });
+
+    document.getElementById("btn-recenter").addEventListener("click", () => {
+      state.view.panX = 0; state.view.panY = 0; state.view.zoom = 30;
+      labelZoom.textContent = "100%";
+      render();
+    });
+
+    document.getElementById("btn-zoom-in").addEventListener("click", () => {
+      state.view.zoom = Math.min(120, state.view.zoom * 1.2);
+      labelZoom.textContent = `${Math.round((state.view.zoom / 30) * 100)}%`;
+      render();
+    });
+
+    document.getElementById("btn-zoom-out").addEventListener("click", () => {
+      state.view.zoom = Math.max(12, state.view.zoom * 0.8);
+      labelZoom.textContent = `${Math.round((state.view.zoom / 30) * 100)}%`;
+      render();
+    });
+
+    window.addEventListener("resize", () => {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render();
+    });
+
+    // Boot
+    window.dispatchEvent(new Event("resize"));
+    updateLoadsList();
+    solveArch();
+    state.fbdGap = 60;
+    fbdGapSlider.value = "60";
+    labelFbdGap.textContent = "60px";
+    render();
+  </script>
+</body>
+</html>
