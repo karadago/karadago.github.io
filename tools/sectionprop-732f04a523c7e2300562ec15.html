@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cross-Section Moment of Inertia & Efficiency Analyzer</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --purple: #7c3aed;
+      --teal: #0d9488;
+      --shape-fill: rgba(37, 99, 235, 0.12);
+      --shape-stroke: #1d4ed8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    /* Workspace Canvas Area */
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Floating Viewport Toolbar */
+    .viewport-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+      font-size: 13px;
+      color: var(--text-muted);
+      user-select: none;
+      z-index: 10;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* Sidebar Area */
+    #sidebar {
+      width: 480px;
+      min-width: 430px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.03);
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h1 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Cards */
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 13px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .form-group.full {
+      grid-column: span 2;
+    }
+
+    label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      background: #ffffff;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus, select:focus {
+      border-color: var(--primary);
+    }
+
+    /* Results Math Tables */
+    .math-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .math-table td { padding: 5px 0; }
+    .math-table td:nth-child(1) { color: var(--text-muted); width: 55%; }
+    .math-table td:nth-child(2) {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* Efficiency Meters */
+    .meter-container {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 4px;
+    }
+
+    .meter-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .meter-bar-bg {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .meter-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.25s ease;
+    }
+
+    /* Warning Banner */
+    .warning-banner {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 11px 13px;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #92400e;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .warning-title {
+      font-weight: 700;
+      font-size: 12.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #b45309;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Canvas Workspace -->
+  <div id="canvas-container">
+    <div class="viewport-overlay">
+      <div class="legend-item">
+        <div class="legend-dot" style="background: var(--primary);"></div>
+        <span>Section Boundary</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: var(--danger);"></div>
+        <span>Centroid & Principal Axes</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-dot" style="background: var(--purple);"></div>
+        <span>Dimensioning Lines</span>
+      </div>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <!-- Sidebar Control Panel -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Cross-Section Properties</h1>
+      <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 7px; border-radius: 5px; font-weight: 700;">Section Engine</span>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- 1. Shape Selection & Inputs -->
+      <div class="card">
+        <span class="card-title">1. Section Geometry</span>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Cross-Section Profile</label>
+            <select id="shape-select">
+              <option value="i_beam">Wide-Flange I-Beam</option>
+              <option value="rect_hollow">Hollow Rectangle / Box Section</option>
+              <option value="rect_solid">Solid Rectangle</option>
+              <option value="circle_hollow">Hollow Circle / Pipe Section</option>
+              <option value="circle_solid">Solid Circle</option>
+            </select>
+          </div>
+          <div class="form-group full">
+            <label>Dimensional Units</label>
+            <select id="unit-select">
+              <option value="mm">Millimeters (mm)</option>
+              <option value="cm">Centimeters (cm)</option>
+              <option value="in">Inches (in)</option>
+              <option value="m">Meters (m)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Dynamic Inputs Container -->
+        <div class="form-grid" id="dynamic-inputs" style="border-top: 1px dashed #cbd5e1; padding-top: 10px; margin-top: 2px;">
+          <!-- Injected via JavaScript -->
+        </div>
+      </div>
+
+      <!-- 2. Calculated Section Properties -->
+      <div class="card">
+        <span class="card-title">2. Section Properties & Inertia</span>
+        <table class="math-table">
+          <tr>
+            <td>Cross-Section Area (A):</td>
+            <td id="val-area" style="color: var(--primary);">0.00 mm²</td>
+          </tr>
+          <tr>
+            <td>Major Moment of Inertia (I<sub>x</sub>):</td>
+            <td id="val-ix" style="color: var(--purple);">0.00 mm⁴</td>
+          </tr>
+          <tr>
+            <td>Minor Moment of Inertia (I<sub>y</sub>):</td>
+            <td id="val-iy" style="color: var(--purple);">0.00 mm⁴</td>
+          </tr>
+          <tr>
+            <td>Major Radius of Gyration (r<sub>x</sub>):</td>
+            <td id="val-rx">0.00 mm</td>
+          </tr>
+          <tr>
+            <td>Minor Radius of Gyration (r<sub>y</sub>):</td>
+            <td id="val-ry">0.00 mm</td>
+          </tr>
+          <tr>
+            <td>Major Section Modulus (S<sub>x</sub> = I<sub>x</sub> / y<sub>max</sub>):</td>
+            <td id="val-sx" style="color: var(--teal);">0.00 mm³</td>
+          </tr>
+          <tr>
+            <td>Minor Section Modulus (S<sub>y</sub> = I<sub>y</sub> / x<sub>max</sub>):</td>
+            <td id="val-sy" style="color: var(--teal);">0.00 mm³</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- 3. Dynamic Anisotropy Warning Banner -->
+      <div class="warning-banner" id="anisotropy-card" style="display: none;">
+        <div class="warning-title">
+          <span>⚠️ Directional Inertia Asymmetry Detected (I<sub>x</sub> ≠ I<sub>y</sub>)</span>
+        </div>
+        <div id="anisotropy-desc">
+          The major bending stiffness is significantly greater than the minor stiffness.
+        </div>
+      </div>
+
+      <!-- 4. Structural Material Efficiency Calculator -->
+      <div class="card">
+        <span class="card-title">3. Structural Efficiency Analysis</span>
+        <div style="font-size: 11.5px; color: var(--text-muted); line-height: 1.4;">
+          Evaluates how effectively material is deployed relative to its solid bounding envelope (<span id="val-box-dims">0 × 0</span>).
+        </div>
+
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>Material Area Deployed:</span>
+            <span id="val-area-pct" style="color: var(--primary);">100.0%</span>
+          </div>
+          <div class="meter-bar-bg">
+            <div class="meter-bar-fill" id="bar-area" style="width: 100%; background: var(--primary);"></div>
+          </div>
+        </div>
+
+        <div class="meter-container">
+          <div class="meter-header">
+            <span>Major Inertia Retained (I<sub>x</sub> / I<sub>x,box</sub>):</span>
+            <span id="val-ix-pct" style="color: var(--purple);">100.0%</span>
+          </div>
+          <div class="meter-bar-bg">
+            <div class="meter-bar-fill" id="bar-ix" style="width: 100%; background: var(--purple);"></div>
+          </div>
+        </div>
+
+        <table class="math-table" style="margin-top: 6px; border-top: 1px dashed #cbd5e1; padding-top: 6px;">
+          <tr>
+            <td>Structural Efficiency Index (SEI<sub>x</sub>):</td>
+            <td id="val-sei" style="color: var(--success); font-weight: 800;">1.00</td>
+          </tr>
+          <tr>
+            <td>Major Radius/Depth Ratio (r<sub>x</sub> / h):</td>
+            <td id="val-r-depth-ratio">0.289</td>
+          </tr>
+        </table>
+        <div style="font-size: 11px; color: var(--text-muted); font-style: italic; margin-top: 2px;">
+          *SEI<sub>x</sub> = (% Inertia Retained) / (% Area Deployed). Values > 1.0 indicate highly efficient material distribution far from the centroid.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- State Management ---
+    let state = {
+      shape: "i_beam", // i_beam, rect_hollow, rect_solid, circle_hollow, circle_solid
+      unit: "mm",
+      params: {
+        // I-Beam defaults
+        bf: 150,
+        h: 300,
+        tw: 8,
+        tf: 12,
+        // Box / Rect defaults
+        b: 150,
+        b_in: 130,
+        h_in: 270,
+        // Circle defaults
+        d: 200,
+        d_out: 200,
+        d_in: 170
+      },
+      results: {
+        A: 0, Ix: 0, Iy: 0, rx: 0, ry: 0, Sx: 0, Sy: 0,
+        A_box: 0, Ix_box: 0, Iy_box: 0,
+        area_pct: 100, ix_pct: 100, sei: 1.0
+      }
+    };
+
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
+
+    const shapeSelect = document.getElementById("shape-select");
+    const unitSelect = document.getElementById("unit-select");
+    const dynamicInputs = document.getElementById("dynamic-inputs");
+
+    // UI Input Definitions per Shape
+    const shapeConfigs = {
+      i_beam: [
+        { key: "h", label: "Total Height h", default: 300, step: 5 },
+        { key: "bf", label: "Flange Width b_f", default: 150, step: 5 },
+        { key: "tf", label: "Flange Thickness t_f", default: 12, step: 1 },
+        { key: "tw", label: "Web Thickness t_w", default: 8, step: 1 }
+      ],
+      rect_hollow: [
+        { key: "h", label: "Outer Height h", default: 200, step: 5 },
+        { key: "b", label: "Outer Width b", default: 100, step: 5 },
+        { key: "tf", label: "Flange/Top Thickness t_f", default: 10, step: 1 },
+        { key: "tw", label: "Web/Side Thickness t_w", default: 8, step: 1 }
+      ],
+      rect_solid: [
+        { key: "h", label: "Height h", default: 200, step: 5 },
+        { key: "b", label: "Width b", default: 100, step: 5 }
+      ],
+      circle_hollow: [
+        { key: "d_out", label: "Outer Diameter D_out", default: 200, step: 5 },
+        { key: "tw", label: "Wall Thickness t", default: 10, step: 1 }
+      ],
+      circle_solid: [
+        { key: "d", label: "Diameter D", default: 200, step: 5 }
+      ]
+    };
+
+    function renderInputForm() {
+      dynamicInputs.innerHTML = "";
+      const fields = shapeConfigs[state.shape];
+
+      fields.forEach(f => {
+        const div = document.createElement("div");
+        div.className = "form-group";
+        const val = state.params[f.key] !== undefined ? state.params[f.key] : f.default;
+        state.params[f.key] = val;
+
+        div.innerHTML = `
+          <label>${f.label} (${state.unit})</label>
+          <input type="number" id="input-${f.key}" value="${val}" step="${f.step}" min="1">
+        `;
+        dynamicInputs.appendChild(div);
+
+        div.querySelector("input").addEventListener("input", (e) => {
+          state.params[f.key] = parseFloat(e.target.value) || 0;
+          calculateProperties();
+          drawCanvas();
+        });
+      });
+    }
+
+    // --- Rigorous Cross-Section Property Calculations ---
+    function calculateProperties() {
+      const p = state.params;
+      let A = 0, Ix = 0, Iy = 0, x_max = 1, y_max = 1;
+      let A_box = 0, Ix_box = 0;
+
+      if (state.shape === "i_beam") {
+        const h = p.h, bf = p.bf, tf = p.tf, tw = p.tw;
+        y_max = h / 2;
+        x_max = bf / 2;
+
+        A = 2 * bf * tf + (h - 2 * tf) * tw;
+        // Ix = (bf * h^3 - (bf - tw) * (h - 2*tf)^3) / 12
+        Ix = (bf * Math.pow(h, 3) - (bf - tw) * Math.pow(h - 2 * tf, 3)) / 12;
+        // Iy = 2 * (tf * bf^3 / 12) + (h - 2*tf) * tw^3 / 12
+        Iy = (2 * tf * Math.pow(bf, 3) + (h - 2 * tf) * Math.pow(tw, 3)) / 12;
+
+        A_box = bf * h;
+        Ix_box = (bf * Math.pow(h, 3)) / 12;
+
+      } else if (state.shape === "rect_hollow") {
+        const h = p.h, b = p.b, tf = p.tf, tw = p.tw;
+        const h_in = h - 2 * tf;
+        const b_in = b - 2 * tw;
+        y_max = h / 2;
+        x_max = b / 2;
+
+        A = (b * h) - (Math.max(0, b_in) * Math.max(0, h_in));
+        Ix = (b * Math.pow(h, 3) - Math.max(0, b_in) * Math.pow(Math.max(0, h_in), 3)) / 12;
+        Iy = (h * Math.pow(b, 3) - Math.max(0, h_in) * Math.pow(Math.max(0, b_in), 3)) / 12;
+
+        A_box = b * h;
+        Ix_box = (b * Math.pow(h, 3)) / 12;
+
+      } else if (state.shape === "rect_solid") {
+        const h = p.h, b = p.b;
+        y_max = h / 2;
+        x_max = b / 2;
+
+        A = b * h;
+        Ix = (b * Math.pow(h, 3)) / 12;
+        Iy = (h * Math.pow(b, 3)) / 12;
+
+        A_box = A;
+        Ix_box = Ix;
+
+      } else if (state.shape === "circle_hollow") {
+        const d_out = p.d_out, tw = p.tw;
+        const d_in = Math.max(0, d_out - 2 * tw);
+        y_max = d_out / 2;
+        x_max = d_out / 2;
+
+        A = (Math.PI / 4) * (Math.pow(d_out, 2) - Math.pow(d_in, 2));
+        Ix = (Math.PI / 64) * (Math.pow(d_out, 4) - Math.pow(d_in, 4));
+        Iy = Ix;
+
+        A_box = d_out * d_out;
+        Ix_box = (d_out * Math.pow(d_out, 3)) / 12;
+
+      } else if (state.shape === "circle_solid") {
+        const d = p.d;
+        y_max = d / 2;
+        x_max = d / 2;
+
+        A = (Math.PI / 4) * Math.pow(d, 2);
+        Ix = (Math.PI / 64) * Math.pow(d, 4);
+        Iy = Ix;
+
+        A_box = d * d;
+        Ix_box = (d * Math.pow(d, 3)) / 12;
+      }
+
+      // Derived Metrics
+      const rx = A > 0 ? Math.sqrt(Ix / A) : 0;
+      const ry = A > 0 ? Math.sqrt(Iy / A) : 0;
+      const Sx = y_max > 0 ? Ix / y_max : 0;
+      const Sy = x_max > 0 ? Iy / x_max : 0;
+
+      const area_pct = A_box > 0 ? (A / A_box) * 100 : 100;
+      const ix_pct = Ix_box > 0 ? (Ix / Ix_box) * 100 : 100;
+      const sei = area_pct > 0 ? (ix_pct / area_pct) : 1.0;
+
+      state.results = { A, Ix, Iy, rx, ry, Sx, Sy, A_box, Ix_box, area_pct, ix_pct, sei, x_max, y_max };
+
+      updateUI();
+    }
+
+    function formatNum(val, decimals = 2) {
+      if (Math.abs(val) >= 1e6 || (Math.abs(val) < 0.01 && Math.abs(val) > 0)) {
+        return val.toExponential(3);
+      }
+      return val.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function updateUI() {
+      const res = state.results;
+      const u = state.unit;
+
+      document.getElementById("val-area").textContent = `${formatNum(res.A)} ${u}²`;
+      document.getElementById("val-ix").textContent = `${formatNum(res.Ix)} ${u}⁴`;
+      document.getElementById("val-iy").textContent = `${formatNum(res.Iy)} ${u}⁴`;
+      document.getElementById("val-rx").textContent = `${formatNum(res.rx)} ${u}`;
+      document.getElementById("val-ry").textContent = `${formatNum(res.ry)} ${u}`;
+      document.getElementById("val-sx").textContent = `${formatNum(res.Sx)} ${u}³`;
+      document.getElementById("val-sy").textContent = `${formatNum(res.Sy)} ${u}³`;
+
+      // Efficiency Card
+      document.getElementById("val-box-dims").textContent = `${formatNum(res.x_max * 2, 1)} × ${formatNum(res.y_max * 2, 1)} ${u}`;
+      document.getElementById("val-area-pct").textContent = `${formatNum(res.area_pct, 1)}%`;
+      document.getElementById("bar-area").style.width = `${Math.min(100, Math.max(0, res.area_pct))}%`;
+
+      document.getElementById("val-ix-pct").textContent = `${formatNum(res.ix_pct, 1)}%`;
+      document.getElementById("bar-ix").style.width = `${Math.min(100, Math.max(0, res.ix_pct))}%`;
+
+      document.getElementById("val-sei").textContent = formatNum(res.sei, 2);
+      const r_depth = (res.y_max > 0) ? (res.rx / (res.y_max * 2)) : 0;
+      document.getElementById("val-r-depth-ratio").textContent = formatNum(r_depth, 3);
+
+      // Anisotropy Warning logic (Ix vs Iy)
+      const anisotropyCard = document.getElementById("anisotropy-card");
+      const ratio = res.Iy > 0 ? (res.Ix / res.Iy) : 1.0;
+
+      if (Math.abs(res.Ix - res.Iy) / Math.max(res.Ix, res.Iy) > 0.02) {
+        anisotropyCard.style.display = "flex";
+        if (res.Ix > res.Iy) {
+          document.getElementById("anisotropy-desc").innerHTML =
+            `Major axis bending stiffness is <strong>${formatNum(ratio, 2)}× greater</strong> than minor axis (I<sub>x</sub> = ${formatNum(ratio, 1)} I<sub>y</sub>).<br>` +
+            `• <strong>Strong Axis:</strong> X-X axis bending resistance.<br>` +
+            `• <strong>Weak Axis Warning:</strong> Susceptible to minor-axis lateral-torsional or column buckling unless braced against Y-Y flexure.`;
+        } else {
+          document.getElementById("anisotropy-desc").innerHTML =
+            `Minor axis stiffness is <strong>${formatNum(1 / ratio, 2)}× greater</strong> than major axis (I<sub>y</sub> = ${formatNum(1 / ratio, 1)} I<sub>x</sub>).`;
+        }
+      } else {
+        anisotropyCard.style.display = "none";
+      }
+    }
+
+    // --- HTML5 Canvas Rendering Engine ---
+    function drawCanvas() {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      const p = state.params;
+      const res = state.results;
+
+      // Auto-scaling factor to fit canvas cleanly with padding
+      const boxW = res.x_max * 2 || 100;
+      const boxH = res.y_max * 2 || 100;
+      const scale = Math.min((w * 0.55) / boxW, (h * 0.55) / boxH);
+
+      const cx = w / 2;
+      const cy = h / 2;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+
+      // 1. Draw Section Material Geometry
+      ctx.fillStyle = "rgba(37, 99, 235, 0.12)";
+      ctx.strokeStyle = "#1d4ed8";
+      ctx.lineWidth = 2.5;
+
+      if (state.shape === "i_beam") {
+        const H = p.h * scale;
+        const B = p.bf * scale;
+        const TF = p.tf * scale;
+        const TW = p.tw * scale;
+
+        ctx.beginPath();
+        // Top Flange
+        ctx.rect(-B / 2, -H / 2, B, TF);
+        // Bottom Flange
+        ctx.rect(-B / 2, H / 2 - TF, B, TF);
+        // Web
+        ctx.rect(-TW / 2, -H / 2 + TF, TW, H - 2 * TF);
+        ctx.fill();
+        ctx.stroke();
+
+      } else if (state.shape === "rect_hollow") {
+        const H = p.h * scale;
+        const B = p.b * scale;
+        const Hin = Math.max(0, p.h - 2 * p.tf) * scale;
+        const Bin = Math.max(0, p.b - 2 * p.tw) * scale;
+
+        ctx.beginPath();
+        ctx.rect(-B / 2, -H / 2, B, H);
+        if (Bin > 0 && Hin > 0) {
+          ctx.rect(-Bin / 2, -Hin / 2, Bin, Hin); // Path winding cutout
+        }
+        ctx.fill("evenodd");
+        ctx.stroke();
+
+      } else if (state.shape === "rect_solid") {
+        const H = p.h * scale;
+        const B = p.b * scale;
+
+        ctx.beginPath();
+        ctx.rect(-B / 2, -H / 2, B, H);
+        ctx.fill();
+        ctx.stroke();
+
+      } else if (state.shape === "circle_hollow") {
+        const Rout = (p.d_out / 2) * scale;
+        const Rin = Math.max(0, p.d_out / 2 - p.tw) * scale;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, Rout, 0, 2 * Math.PI, false);
+        if (Rin > 0) {
+          ctx.arc(0, 0, Rin, 0, 2 * Math.PI, true);
+        }
+        ctx.fill("evenodd");
+        ctx.stroke();
+
+      } else if (state.shape === "circle_solid") {
+        const R = (p.d / 2) * scale;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, R, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 2. Centroid & Principal Axes (X-X and Y-Y)
+      const axisLenX = Math.max(boxW * scale * 0.7, 120);
+      const axisLenY = Math.max(boxH * scale * 0.7, 120);
+
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+
+      // X-X Axis (Major)
+      ctx.beginPath();
+      ctx.moveTo(-axisLenX, 0); ctx.lineTo(axisLenX, 0);
+      ctx.stroke();
+
+      // Y-Y Axis (Minor)
+      ctx.beginPath();
+      ctx.moveTo(0, -axisLenY); ctx.lineTo(0, axisLenY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Axis Labels
+      ctx.fillStyle = "#dc2626";
+      ctx.font = "bold 12px sans-serif";
+      ctx.fillText("X", axisLenX + 8, 4);
+      ctx.fillText("Y", -4, -axisLenY - 8);
+
+      // Centroid Target Symbol
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#dc2626";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 2.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#dc2626";
+      ctx.fill();
+
+      // 3. Dimension Witness Lines
+      drawDimensioning(scale, boxW, boxH);
+
+      ctx.restore();
+    }
+
+    function drawDimensioning(scale, boxW, boxH) {
+      const p = state.params;
+      const u = state.unit;
+      const purple = "#7c3aed";
+
+      ctx.strokeStyle = purple;
+      ctx.fillStyle = purple;
+      ctx.lineWidth = 1.2;
+
+      // Outer Height h
+      const offX = (boxW * scale) / 2 + 35;
+      const halfH = (boxH * scale) / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(offX - 10, -halfH); ctx.lineTo(offX + 10, -halfH);
+      ctx.moveTo(offX - 10, halfH);  ctx.lineTo(offX + 10, halfH);
+      ctx.moveTo(offX, -halfH);      ctx.lineTo(offX, halfH);
+      ctx.stroke();
+
+      drawArrowHead(offX, -halfH, -Math.PI / 2, purple);
+      drawArrowHead(offX, halfH, Math.PI / 2, purple);
+      drawBadge(`${boxH.toFixed(1)} ${u}`, offX + 18, 0, purple);
+
+      // Outer Width b
+      const offY = (boxH * scale) / 2 + 35;
+      const halfW = (boxW * scale) / 2;
+
+      ctx.beginPath();
+      ctx.moveTo(-halfW, offY - 10); ctx.lineTo(-halfW, offY + 10);
+      ctx.moveTo(halfW, offY - 10);  ctx.lineTo(halfW, offY + 10);
+      ctx.moveTo(-halfW, offY);      ctx.lineTo(halfW, offY);
+      ctx.stroke();
+
+      drawArrowHead(-halfW, offY, Math.PI, purple);
+      drawArrowHead(halfW, offY, 0, purple);
+      drawBadge(`${boxW.toFixed(1)} ${u}`, 0, offY + 16, purple);
+    }
+
+    function drawArrowHead(x, y, angle, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-7, -3.5);
+      ctx.lineTo(-7, 3.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBadge(text, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 11px sans-serif";
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(x - w / 2, y - 7, w, 14);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- Event Listeners ---
+    shapeSelect.addEventListener("change", (e) => {
+      state.shape = e.target.value;
+      renderInputForm();
+      calculateProperties();
+      drawCanvas();
+    });
+
+    unitSelect.addEventListener("change", (e) => {
+      state.unit = e.target.value;
+      renderInputForm();
+      calculateProperties();
+      drawCanvas();
+    });
+
+    window.addEventListener("resize", () => {
+      drawCanvas();
+    });
+
+    // Boot Initializer
+    renderInputForm();
+    calculateProperties();
+    drawCanvas();
+  </script>
+</body>
+</html>
