@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Truss System Analyzer</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a; /* Tension */
+      --danger: #dc2626;  /* Compression */
+      --zero-force: #94a3b8; /* ZFM */
+      --purple: #7c3aed;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    /* Main Canvas Workspace */
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+      cursor: crosshair;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Floating Viewport Overlay Toolbar */
+    .viewport-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      font-size: 13px;
+      color: var(--text-muted);
+      align-items: center;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .tool-btn {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-main);
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .tool-btn:hover { background: #e2e8f0; }
+
+    .tool-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary-hover);
+    }
+
+    .preset-btn {
+      background: #fdf4ff;
+      border-color: #d8b4fe;
+      color: #7e22ce;
+      font-weight: 700;
+    }
+    .preset-btn:hover { background: #f3e8ff; }
+
+    .file-btn {
+      background: #f0fdf4;
+      border-color: #86efac;
+      color: #15803d;
+      font-weight: 700;
+    }
+    .file-btn:hover { background: #dcfce7; }
+
+    /* Left Sidebar */
+    #sidebar {
+      width: 460px;
+      min-width: 410px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.03);
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h1 {
+      font-size: 17.5px;
+      font-weight: 700;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Cards */
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 13px 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card-title {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .form-group.full { grid-column: span 2; }
+
+    label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      background: #ffffff;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus, select:focus {
+      border-color: var(--primary);
+    }
+
+    .btn {
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s ease;
+      text-align: center;
+    }
+
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+
+    .btn-solve {
+      background: #7c3aed;
+      color: white;
+      font-size: 14px;
+    }
+    .btn-solve:hover { background: #6d28d9; }
+
+    .btn-danger {
+      background: #fee2e2;
+      color: var(--danger);
+      border: 1px solid #fca5a5;
+    }
+    .btn-danger:hover { background: #fecaca; }
+
+    /* Editable Joints Table */
+    .joint-list-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .joint-list-table th {
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .joint-list-table td { padding: 3px 2px; }
+
+    .joint-list-table input {
+      padding: 4px 6px;
+      font-size: 12px;
+    }
+
+    .joint-delete-btn {
+      background: none;
+      border: none;
+      color: #94a3b8;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+    .joint-delete-btn:hover { color: var(--danger); }
+
+    /* Solution Results Table */
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .results-table th, .results-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .results-table th {
+      background: #f1f5f9;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .badge-comp { color: var(--danger); font-weight: 700; }
+    .badge-tens { color: var(--success); font-weight: 700; }
+    .badge-zfc { color: var(--zero-force); font-weight: 700; }
+
+    .legend-bar {
+      display: flex;
+      gap: 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot {
+      width: 100px;
+      height: 10px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Truss System Analyzer</h1>
+      <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 7px; border-radius: 5px; font-weight: 700;">2D Direct Stiffness</span>
+    </div>
+
+    <div class="sidebar-content">
+      <!-- 1. Editable Joint Location Printer -->
+      <div class="card">
+        <span class="card-title">
+          <span>1. Joint Coordinates</span>
+          <span style="font-size: 10px; color: var(--text-muted); text-transform: none;">Click grid or edit below</span>
+        </span>
+        <div style="max-height: 160px; overflow-y: auto;">
+          <table class="joint-list-table">
+            <thead>
+              <tr>
+                <th style="width: 20%;">Joint</th>
+                <th style="width: 35%;">X (m)</th>
+                <th style="width: 35%;">Y (m)</th>
+                <th style="width: 10%;"></th>
+              </tr>
+            </thead>
+            <tbody id="joints-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Joint Load Assignment (Streamlined) -->
+      <div class="card">
+        <span class="card-title">2. Selected Joint Loads</span>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Select Joint / Node</label>
+            <select id="select-active-joint"></select>
+          </div>
+          <div class="form-group">
+            <label>Load F<sub>x</sub> (kN) [→ Pos]</label>
+            <input type="number" id="input-fx" value="0" step="5">
+          </div>
+          <div class="form-group">
+            <label>Load F<sub>y</sub> (kN) [↑ Pos, − Down]</label>
+            <input type="number" id="input-fy" value="-50" step="5">
+          </div>
+          <div class="form-group full">
+            <button class="btn btn-primary" id="btn-apply-joint-props">Apply Load to Joint</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Solve & Analyze Button -->
+      <div class="card">
+        <span class="card-title">3. Structural Analysis</span>
+        <button class="btn btn-solve" id="btn-solve">Analyze Truss System</button>
+      </div>
+
+      <!-- 4. Tabular Results Output -->
+      <div class="card" id="card-results" style="display: none;">
+        <span class="card-title">4. Member Forces Solution</span>
+
+        <div class="legend-bar">
+          <div class="legend-item">
+            <div class="legend-dot" style="background: var(--danger); width: 10px;"></div>
+            <span>Compression</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: var(--success); width: 10px;"></div>
+            <span>Tension</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background: var(--zero-force); width: 10px;"></div>
+            <span>Zero Force</span>
+          </div>
+        </div>
+
+        <div style="max-height: 240px; overflow-y: auto; margin-top: 6px;">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Length (m)</th>
+                <th>Force (kN)</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody id="results-table-body">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <div style="border-top: 1px dashed #cbd5e1; padding-top: 8px; margin-top: 6px;">
+          <span class="card-title" style="margin-bottom: 6px;">Support Reactions</span>
+          <div id="reactions-summary" style="font-size: 12px; font-family: monospace; line-height: 1.6;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Main Canvas Workspace -->
+  <div id="canvas-container">
+    <div class="viewport-overlay">
+      <!-- Modeling Tools -->
+      <button class="tool-btn active" id="tool-joint">📍 Joint</button>
+      <button class="tool-btn" id="tool-member">📏 Member</button>
+      <button class="tool-btn" id="tool-pin">📐 Pin</button>
+      <button class="tool-btn" id="tool-roller">🛹 Roller</button>
+      <button class="tool-btn" id="tool-select">🎯 Select</button>
+      
+      <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 2px;"></span>
+      
+      <!-- File Operations -->
+      <button class="tool-btn file-btn" id="btn-save">💾 Save JSON</button>
+      <button class="tool-btn file-btn" id="btn-load">📂 Load JSON</button>
+      <input type="file" id="file-input" accept=".json" style="display: none;">
+
+      <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 2px;"></span>
+
+      <!-- Presets -->
+      <button class="tool-btn preset-btn" id="btn-preset-warren">🎲 Warren</button>
+      <button class="tool-btn preset-btn" id="btn-preset-mod-warren">🎲 Mod. Warren</button>
+      <button class="tool-btn preset-btn" id="btn-preset-pratt">🎲 Pratt</button>
+      <button class="tool-btn preset-btn" id="btn-preset-howe">🎲 Howe</button>
+
+      <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 2px;"></span>
+
+      <!-- View Controls -->
+      <button class="tool-btn" id="btn-zoom-out">−</button>
+      <span id="label-zoom" style="font-weight: 600; min-width: 34px; text-align: center;">100%</span>
+      <button class="tool-btn" id="btn-zoom-in">+</button>
+      <button class="tool-btn" id="btn-recenter">Recenter</button>
+      <button class="tool-btn btn-danger" id="btn-clear-all" style="margin-left: 4px;">Clear All</button>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <script>
+    // --- Application State ---
+    let state = {
+      joints: [],   // { id, name, x, y, support: 'none'|'pin'|'roller_h'|'roller_v', fx, fy }
+      members: [],  // { id, n1, n2, force, type: 'C'|'T'|'ZFC' }
+      activeTool: "joint",
+      selectedJointId: null,
+      memberStartJointId: null,
+      solved: false,
+      reactions: {},
+      view: { panX: 60, panY: -60, zoom: 42 }
+    };
+
+    let nextJointId = 0;
+    let nextMemberId = 0;
+
+    // DOM References
+    const canvas = document.getElementById("stage");
+    const ctx = canvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
+
+    const jointsTableBody = document.getElementById("joints-table-body");
+    const selectActiveJoint = document.getElementById("select-active-joint");
+    const inputFx = document.getElementById("input-fx");
+    const inputFy = document.getElementById("input-fy");
+
+    const cardResults = document.getElementById("card-results");
+    const resultsTableBody = document.getElementById("results-table-body");
+    const reactionsSummary = document.getElementById("reactions-summary");
+    const labelZoom = document.getElementById("label-zoom");
+    const fileInput = document.getElementById("file-input");
+
+    // Coordinate Transforms
+    function worldToScreen(wx, wy) {
+      const rect = container.getBoundingClientRect();
+      const originX = rect.width / 2 + state.view.panX;
+      const originY = rect.height / 2 + state.view.panY;
+      return {
+        x: originX + wx * state.view.zoom,
+        y: originY - wy * state.view.zoom
+      };
+    }
+
+    function screenToWorld(sx, sy) {
+      const rect = container.getBoundingClientRect();
+      const originX = rect.width / 2 + state.view.panX;
+      const originY = rect.height / 2 + state.view.panY;
+      return {
+        x: (sx - originX) / state.view.zoom,
+        y: -(sy - originY) / state.view.zoom
+      };
+    }
+
+    function snapToGrid(val, step = 0.5) {
+      return Math.round(val / step) * step;
+    }
+
+    function getJointName(index) {
+      let name = "";
+      while (index >= 0) {
+        name = String.fromCharCode(65 + (index % 26)) + name;
+        index = Math.floor(index / 26) - 1;
+      }
+      return name;
+    }
+
+    function reindexJointNames() {
+      state.joints.forEach((j, idx) => { j.name = getJointName(idx); });
+    }
+
+    // --- Core Modeling Operations ---
+    function addJoint(wx, wy) {
+      const existing = state.joints.find(j => Math.hypot(j.x - wx, j.y - wy) < 0.2);
+      if (existing) return existing;
+
+      const newJoint = {
+        id: nextJointId++,
+        name: getJointName(state.joints.length),
+        x: wx,
+        y: wy,
+        support: "none",
+        fx: 0,
+        fy: 0
+      };
+      state.joints.push(newJoint);
+      reindexJointNames();
+      updateUI();
+      render();
+      return newJoint;
+    }
+
+    function addMember(n1Id, n2Id) {
+      if (n1Id === n2Id) return;
+
+      const j1 = state.joints.find(j => j.id === n1Id);
+      const j2 = state.joints.find(j => j.id === n2Id);
+      if (!j1 || !j2) return;
+
+      // Auto-subdivision of long member chords passing through intermediate joints
+      const collinearJoints = [];
+      const eps = 1e-4;
+
+      state.joints.forEach(j => {
+        const dx = j2.x - j1.x;
+        const dy = j2.y - j1.y;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-8) return;
+
+        const t = ((j.x - j1.x) * dx + (j.y - j1.y) * dy) / lenSq;
+        if (t >= -eps && t <= 1 + eps) {
+          const projX = j1.x + t * dx;
+          const projY = j1.y + t * dy;
+          if (Math.hypot(j.x - projX, j.y - projY) < 0.08) {
+            collinearJoints.push({ joint: j, t: t });
+          }
+        }
+      });
+
+      collinearJoints.sort((a, b) => a.t - b.t);
+
+      for (let i = 0; i < collinearJoints.length - 1; i++) {
+        const ja = collinearJoints[i].joint;
+        const jb = collinearJoints[i + 1].joint;
+
+        const exists = state.members.some(
+          m => (m.n1 === ja.id && m.n2 === jb.id) || (m.n1 === jb.id && m.n2 === ja.id)
+        );
+
+        if (!exists) {
+          state.members.push({
+            id: nextMemberId++,
+            n1: ja.id,
+            n2: jb.id,
+            force: 0,
+            type: "ZFC"
+          });
+        }
+      }
+
+      state.solved = false;
+      cardResults.style.display = "none";
+      updateUI();
+      render();
+    }
+
+    // --- Direct Stiffness Matrix Solver ---
+    function solveTruss() {
+      const numNodes = state.joints.length;
+      if (numNodes < 3 || state.members.length < 3) {
+        alert("Please construct a valid truss with at least 3 joints and 3 members.");
+        return;
+      }
+
+      const numDofs = 2 * numNodes;
+      const K = Array.from({ length: numDofs }, () => new Array(numDofs).fill(0));
+      const F = new Array(numDofs).fill(0);
+      const isFixed = new Array(numDofs).fill(false);
+
+      const jointMap = {};
+      state.joints.forEach((j, idx) => {
+        jointMap[j.id] = idx;
+        const dofX = 2 * idx;
+        const dofY = 2 * idx + 1;
+
+        F[dofX] = j.fx;
+        F[dofY] = j.fy;
+
+        if (j.support === "pin") {
+          isFixed[dofX] = true;
+          isFixed[dofY] = true;
+        } else if (j.support === "roller_h") {
+          isFixed[dofY] = true;
+        } else if (j.support === "roller_v") {
+          isFixed[dofX] = true;
+        }
+      });
+
+      const EA = 10000;
+      state.members.forEach(m => {
+        const i1 = jointMap[m.n1];
+        const i2 = jointMap[m.n2];
+        const j1 = state.joints[i1];
+        const j2 = state.joints[i2];
+
+        const dx = j2.x - j1.x;
+        const dy = j2.y - j1.y;
+        const L = Math.hypot(dx, dy);
+        const c = dx / L;
+        const s = dy / L;
+
+        const k_local = (EA / L);
+        const dofs = [2 * i1, 2 * i1 + 1, 2 * i2, 2 * i2 + 1];
+        const B = [-c, -s, c, s];
+
+        for (let r = 0; r < 4; r++) {
+          for (let col = 0; col < 4; col++) {
+            K[dofs[r]][dofs[col]] += k_local * B[r] * B[col];
+          }
+        }
+      });
+
+      const K_reduced = K.map(row => [...row]);
+      const F_reduced = [...F];
+
+      for (let i = 0; i < numDofs; i++) {
+        if (isFixed[i]) {
+          for (let j = 0; j < numDofs; j++) {
+            K_reduced[i][j] = 0;
+            K_reduced[j][i] = 0;
+          }
+          K_reduced[i][i] = 1;
+          F_reduced[i] = 0;
+        }
+      }
+
+      const U = gaussianElimination(K_reduced, F_reduced);
+      if (!U) {
+        alert("Truss is geometrically unstable or under-constrained! Please check support conditions.");
+        return;
+      }
+
+      state.members.forEach(m => {
+        const i1 = jointMap[m.n1];
+        const i2 = jointMap[m.n2];
+        const j1 = state.joints[i1];
+        const j2 = state.joints[i2];
+
+        const dx = j2.x - j1.x;
+        const dy = j2.y - j1.y;
+        const L = Math.hypot(dx, dy);
+        const c = dx / L;
+        const s = dy / L;
+
+        const u1x = U[2 * i1];
+        const u1y = U[2 * i1 + 1];
+        const u2x = U[2 * i2];
+        const u2y = U[2 * i2 + 1];
+
+        const N = (EA / L) * (-c * u1x - s * u1y + c * u2x + s * u2y);
+        m.force = N;
+
+        if (Math.abs(N) < 0.01) m.type = "ZFC";
+        else if (N > 0) m.type = "T";
+        else m.type = "C";
+      });
+
+      state.reactions = {};
+      state.joints.forEach((j, idx) => {
+        if (j.support !== "none") {
+          const dofX = 2 * idx;
+          const dofY = 2 * idx + 1;
+
+          let Rx = 0, Ry = 0;
+          for (let col = 0; col < numDofs; col++) {
+            Rx += K[dofX][col] * U[col];
+            Ry += K[dofY][col] * U[col];
+          }
+          Rx -= j.fx;
+          Ry -= j.fy;
+
+          state.reactions[j.name] = { Rx, Ry };
+        }
+      });
+
+      state.solved = true;
+      populateResultsTable();
+      render();
+    }
+
+    function gaussianElimination(A, b) {
+      const n = b.length;
+      for (let i = 0; i < n; i++) {
+        let maxRow = i;
+        for (let k = i + 1; k < n; k++) {
+          if (Math.abs(A[k][i]) > Math.abs(A[maxRow][i])) maxRow = k;
+        }
+        [A[i], A[maxRow]] = [A[maxRow], A[i]];
+        [b[i], b[maxRow]] = [b[maxRow], b[i]];
+
+        if (Math.abs(A[i][i]) < 1e-9) return null;
+
+        for (let k = i + 1; k < n; k++) {
+          const factor = A[k][i] / A[i][i];
+          for (let j = i; j < n; j++) A[k][j] -= factor * A[i][j];
+          b[k] -= factor * b[i];
+        }
+      }
+
+      const x = new Array(n).fill(0);
+      for (let i = n - 1; i >= 0; i--) {
+        let sum = b[i];
+        for (let j = i + 1; j < n; j++) sum -= A[i][j] * x[j];
+        x[i] = sum / A[i][i];
+      }
+      return x;
+    }
+
+    // --- Canvas Rendering Engine ---
+    function render() {
+      const rect = container.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      drawGraphGrid(w, h);
+
+      // Members
+      state.members.forEach(m => {
+        const j1 = state.joints.find(j => j.id === m.n1);
+        const j2 = state.joints.find(j => j.id === m.n2);
+        if (!j1 || !j2) return;
+
+        const p1 = worldToScreen(j1.x, j1.y);
+        const p2 = worldToScreen(j2.x, j2.y);
+
+        ctx.lineWidth = 4;
+        if (state.solved) {
+          if (m.type === "C") ctx.strokeStyle = "#dc2626";      // Red (Compression)
+          else if (m.type === "T") ctx.strokeStyle = "#16a34a"; // Green (Tension)
+          else ctx.strokeStyle = "#94a3b8";                     // Gray (ZFC)
+        } else {
+          ctx.strokeStyle = "#334155";
+        }
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+
+        if (state.solved) {
+          const midX = (p1.x + p2.x) / 2;
+          const midY = (p1.y + p2.y) / 2;
+          const forceVal = Math.abs(m.force).toFixed(1);
+          const typeLabel = m.type === "C" ? " (C)" : m.type === "T" ? " (T)" : " (0)";
+          const text = `${forceVal} kN${typeLabel}`;
+          const col = m.type === "C" ? "#dc2626" : m.type === "T" ? "#16a34a" : "#64748b";
+          drawBadge(text, midX, midY, col);
+        }
+      });
+
+      // Member Preview
+      if (state.activeTool === "member" && state.memberStartJointId !== null) {
+        const startJ = state.joints.find(j => j.id === state.memberStartJointId);
+        if (startJ) {
+          const p1 = worldToScreen(startJ.x, startJ.y);
+          ctx.strokeStyle = "#2563eb";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(mouseScreenPos.x, mouseScreenPos.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
+      // Supports & Loads
+      state.joints.forEach(j => {
+        const p = worldToScreen(j.x, j.y);
+
+        if (j.support === "pin") drawPinSupport(p.x, p.y);
+        else if (j.support === "roller_h") drawRollerSupport(p.x, p.y, "h");
+        else if (j.support === "roller_v") drawRollerSupport(p.x, p.y, "v");
+
+        if (j.fx !== 0 || j.fy !== 0) {
+          drawLoadArrow(p.x, p.y, j.fx, j.fy);
+        }
+
+        if (state.solved && state.reactions[j.name]) {
+          const rxn = state.reactions[j.name];
+          if (Math.abs(rxn.Rx) > 0.05) drawReactionVector(p.x, p.y, rxn.Rx, 0, `R_${j.name}x`);
+          if (Math.abs(rxn.Ry) > 0.05) drawReactionVector(p.x, p.y, 0, rxn.Ry, `R_${j.name}y`);
+        }
+      });
+
+      // Joints / Nodes
+      state.joints.forEach(j => {
+        const p = worldToScreen(j.x, j.y);
+        const isSelected = j.id === state.selectedJointId;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isSelected ? 8 : 6, 0, 2 * Math.PI);
+        ctx.fillStyle = isSelected ? "#2563eb" : "#ffffff";
+        ctx.fill();
+        ctx.strokeStyle = isSelected ? "#1d4ed8" : "#0f172a";
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.stroke();
+
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 13px sans-serif";
+        ctx.fillText(j.name, p.x + 10, p.y - 10);
+      });
+    }
+
+    function drawGraphGrid(w, h) {
+      const zoom = state.view.zoom;
+      const originX = w / 2 + state.view.panX;
+      const originY = h / 2 + state.view.panY;
+
+      const minorStep = zoom * 0.5;
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "#e2e8f0";
+      ctx.beginPath();
+      for (let x = originX % minorStep; x < w; x += minorStep) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = originY % minorStep; y < h; y += minorStep) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      const majorStep = zoom;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.beginPath();
+      for (let x = originX % majorStep; x < w; x += majorStep) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = originY % majorStep; y < h; y += majorStep) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = "#94a3b8";
+      ctx.beginPath();
+      ctx.moveTo(originX, 0); ctx.lineTo(originX, h);
+      ctx.moveTo(0, originY); ctx.lineTo(w, originY);
+      ctx.stroke();
+    }
+
+    function drawPinSupport(sx, sy) {
+      ctx.save();
+      ctx.fillStyle = "#64748b";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - 12, sy + 18);
+      ctx.lineTo(sx + 12, sy + 18);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sx - 16, sy + 19);
+      ctx.lineTo(sx + 16, sy + 19);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawRollerSupport(sx, sy, orient = "h") {
+      ctx.save();
+      ctx.fillStyle = "#64748b";
+
+      if (orient === "h") {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx - 10, sy + 14);
+        ctx.lineTo(sx + 10, sy + 14);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(sx - 6, sy + 18, 3, 0, 2 * Math.PI);
+        ctx.arc(sx + 6, sy + 18, 3, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx - 14, sy + 22);
+        ctx.lineTo(sx + 14, sy + 22);
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(sx - 14, sy - 10);
+        ctx.lineTo(sx - 14, sy + 10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(sx - 18, sy - 6, 3, 0, 2 * Math.PI);
+        ctx.arc(sx - 18, sy + 6, 3, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawLoadArrow(sx, sy, fx, fy) {
+      const len = 40;
+      let fromX = sx, fromY = sy;
+
+      if (fy !== 0) {
+        fromY = fy < 0 ? sy - len : sy + len;
+        drawArrow(fromX, fromY, sx, sy, "#dc2626", 2.5);
+        drawBadge(`${Math.abs(fy)} kN`, fromX + 12, (fromY + sy) / 2, "#dc2626");
+      }
+      if (fx !== 0) {
+        fromX = fx > 0 ? sx - len : sx + len;
+        drawArrow(fromX, sy, sx, sy, "#dc2626", 2.5);
+        drawBadge(`${Math.abs(fx)} kN`, (fromX + sx) / 2, sy - 14, "#dc2626");
+      }
+    }
+
+    function drawReactionVector(sx, sy, rx, ry, label) {
+      const len = 42;
+      const col = "#7c3aed";
+
+      if (ry !== 0) {
+        const fromY = ry > 0 ? sy + len : sy - len;
+        drawArrow(sx, fromY, sx, sy + (ry > 0 ? 6 : -6), col, 3);
+        drawBadge(`${label} = ${Math.abs(ry).toFixed(1)} kN`, sx, fromY + (ry > 0 ? 14 : -14), col);
+      }
+      if (rx !== 0) {
+        const fromX = rx > 0 ? sx - len : sx + len;
+        drawArrow(fromX, sy, sx + (rx > 0 ? -6 : 6), sy, col, 3);
+        drawBadge(`${label} = ${Math.abs(rx).toFixed(1)} kN`, fromX + (rx > 0 ? -40 : 40), sy - 14, col);
+      }
+    }
+
+    function drawArrow(fromX, fromY, toX, toY, color, width = 2) {
+      const angle = Math.atan2(toY - fromY, toX - fromX);
+      const headLen = 9;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      ctx.lineTo(toX, toY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX - headLen * Math.cos(angle - Math.PI / 6), toY - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(toX - headLen * Math.cos(angle + Math.PI / 6), toY - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawBadge(text, x, y, color) {
+      ctx.save();
+      ctx.font = "bold 11px sans-serif";
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = "#ffffff";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x - w / 2, y - 8, w, 16, 4) : ctx.rect(x - w / 2, y - 8, w, 16);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- UI Update Engines ---
+    function updateUI() {
+      jointsTableBody.innerHTML = "";
+      state.joints.forEach(j => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><strong>${j.name}</strong></td>
+          <td><input type="number" value="${j.x}" step="0.5" onchange="updateJointCoord(${j.id}, 'x', this.value)"></td>
+          <td><input type="number" value="${j.y}" step="0.5" onchange="updateJointCoord(${j.id}, 'y', this.value)"></td>
+          <td><button class="joint-delete-btn" onclick="deleteJoint(${j.id})">&times;</button></td>
+        `;
+        jointsTableBody.appendChild(tr);
+      });
+
+      selectActiveJoint.innerHTML = "";
+      state.joints.forEach(j => {
+        const opt = document.createElement("option");
+        opt.value = j.id;
+        opt.textContent = `Joint ${j.name} (${j.x}, ${j.y})`;
+        if (j.id === state.selectedJointId) opt.selected = true;
+        selectActiveJoint.appendChild(opt);
+      });
+
+      if (state.selectedJointId !== null) {
+        const activeJ = state.joints.find(j => j.id === state.selectedJointId);
+        if (activeJ) {
+          inputFx.value = activeJ.fx;
+          inputFy.value = activeJ.fy;
+        }
+      }
+    }
+
+    function populateResultsTable() {
+      resultsTableBody.innerHTML = "";
+      reactionsSummary.innerHTML = "";
+
+      state.members.forEach(m => {
+        const j1 = state.joints.find(j => j.id === m.n1);
+        const j2 = state.joints.find(j => j.id === m.n2);
+        const len = Math.hypot(j2.x - j1.x, j2.y - j1.y);
+
+        const tr = document.createElement("tr");
+        let badgeClass = m.type === "C" ? "badge-comp" : m.type === "T" ? "badge-tens" : "badge-zfc";
+        let typeName = m.type === "C" ? "COMPRESSION" : m.type === "T" ? "TENSION" : "ZERO FORCE";
+
+        tr.innerHTML = `
+          <td><strong>${j1.name}${j2.name}</strong></td>
+          <td>${len.toFixed(2)} m</td>
+          <td>${Math.abs(m.force).toFixed(2)} kN</td>
+          <td class="${badgeClass}">${typeName}</td>
+        `;
+        resultsTableBody.appendChild(tr);
+      });
+
+      Object.keys(state.reactions).forEach(jName => {
+        const rxn = state.reactions[jName];
+        reactionsSummary.innerHTML += `<div><strong>Joint ${jName}:</strong> R_x = ${rxn.Rx.toFixed(2)} kN, R_y = ${rxn.Ry.toFixed(2)} kN</div>`;
+      });
+
+      cardResults.style.display = "flex";
+    }
+
+    window.updateJointCoord = function(id, axis, val) {
+      const j = state.joints.find(item => item.id === id);
+      if (j) {
+        j[axis] = parseFloat(val) || 0;
+        state.solved = false;
+        cardResults.style.display = "none";
+        render();
+      }
+    };
+
+    window.deleteJoint = function(id) {
+      state.joints = state.joints.filter(j => j.id !== id);
+      state.members = state.members.filter(m => m.n1 !== id && m.n2 !== id);
+      if (state.selectedJointId === id) state.selectedJointId = null;
+      reindexJointNames();
+      state.solved = false;
+      cardResults.style.display = "none";
+      updateUI();
+      render();
+    };
+
+    // --- Interactive Mouse Handlers ---
+    let mouseScreenPos = { x: 0, y: 0 };
+    let isDragging = false;
+    let dragStartPos = { x: 0, y: 0 };
+
+    canvas.addEventListener("mousemove", (e) => {
+      const rect = container.getBoundingClientRect();
+      mouseScreenPos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+      if (isDragging) {
+        state.view.panX += e.clientX - dragStartPos.x;
+        state.view.panY += e.clientY - dragStartPos.y;
+        dragStartPos = { x: e.clientX, y: e.clientY };
+        render();
+      } else if (state.activeTool === "member" && state.memberStartJointId !== null) {
+        render();
+      }
+    });
+
+    canvas.addEventListener("mousedown", (e) => {
+      if (e.button === 1 || e.shiftKey) {
+        isDragging = true;
+        dragStartPos = { x: e.clientX, y: e.clientY };
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const wPos = screenToWorld(sx, sy);
+      const snappedX = snapToGrid(wPos.x, 0.5);
+      const snappedY = snapToGrid(wPos.y, 0.5);
+
+      const clickedJoint = state.joints.find(
+        j => Math.hypot(worldToScreen(j.x, j.y).x - sx, worldToScreen(j.x, j.y).y - sy) < 14
+      );
+
+      if (state.activeTool === "joint") {
+        addJoint(snappedX, snappedY);
+      } else if (state.activeTool === "member") {
+        if (clickedJoint) {
+          if (state.memberStartJointId === null) {
+            state.memberStartJointId = clickedJoint.id;
+          } else {
+            addMember(state.memberStartJointId, clickedJoint.id);
+            state.memberStartJointId = null;
+          }
+        } else {
+          const newJ = addJoint(snappedX, snappedY);
+          if (state.memberStartJointId !== null) {
+            addMember(state.memberStartJointId, newJ.id);
+            state.memberStartJointId = null;
+          }
+        }
+      } else if (state.activeTool === "pin") {
+        if (clickedJoint) {
+          clickedJoint.support = (clickedJoint.support === "pin") ? "none" : "pin";
+          state.solved = false;
+          cardResults.style.display = "none";
+          render();
+        }
+      } else if (state.activeTool === "roller") {
+        if (clickedJoint) {
+          clickedJoint.support = (clickedJoint.support === "roller_h") ? "none" : "roller_h";
+          state.solved = false;
+          cardResults.style.display = "none";
+          render();
+        }
+      } else if (state.activeTool === "select") {
+        if (clickedJoint) {
+          state.selectedJointId = clickedJoint.id;
+          updateUI();
+          render();
+        }
+      }
+    });
+
+    window.addEventListener("mouseup", () => { isDragging = false; });
+
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.15 : 0.85;
+      state.view.zoom = Math.min(120, Math.max(15, state.view.zoom * zoomFactor));
+      labelZoom.textContent = `${Math.round((state.view.zoom / 42) * 100)}%`;
+      render();
+    });
+
+    // --- Toolbar & Controls Handlers ---
+    const toolBtns = ["joint", "member", "pin", "roller", "select"];
+    toolBtns.forEach(t => {
+      document.getElementById(`tool-${t}`).addEventListener("click", () => {
+        state.activeTool = t;
+        state.memberStartJointId = null;
+        toolBtns.forEach(b => document.getElementById(`tool-${b}`).classList.remove("active"));
+        document.getElementById(`tool-${t}`).classList.add("active");
+        render();
+      });
+    });
+
+    document.getElementById("btn-apply-joint-props").addEventListener("click", () => {
+      if (state.selectedJointId === null) return;
+      const j = state.joints.find(item => item.id === state.selectedJointId);
+      if (j) {
+        j.fx = parseFloat(inputFx.value) || 0;
+        j.fy = parseFloat(inputFy.value) || 0;
+        state.solved = false;
+        cardResults.style.display = "none";
+        updateUI();
+        render();
+      }
+    });
+
+    selectActiveJoint.addEventListener("change", (e) => {
+      state.selectedJointId = parseInt(e.target.value);
+      updateUI();
+      render();
+    });
+
+    document.getElementById("btn-solve").addEventListener("click", solveTruss);
+
+    // --- Save & Load Functionality ---
+    document.getElementById("btn-save").addEventListener("click", () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+        joints: state.joints,
+        members: state.members
+      }, null, 2));
+      const dlAnchor = document.createElement("a");
+      dlAnchor.setAttribute("href", dataStr);
+      dlAnchor.setAttribute("download", "truss_model.json");
+      dlAnchor.click();
+    });
+
+    document.getElementById("btn-load").addEventListener("click", () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (data.joints && data.members) {
+            state.joints = data.joints;
+            state.members = data.members;
+            nextJointId = Math.max(0, ...state.joints.map(j => j.id)) + 1;
+            nextMemberId = Math.max(0, ...state.members.map(m => m.id)) + 1;
+            state.solved = false;
+            cardResults.style.display = "none";
+            updateUI();
+            render();
+          }
+        } catch (err) {
+          alert("Invalid truss model JSON file format!");
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // --- Presets (Warren, Modified Warren, Pratt, Howe) ---
+    document.getElementById("btn-preset-warren").addEventListener("click", () => {
+      clearAll();
+      const jA = addJoint(0, 0); jA.support = "pin";
+      const jB = addJoint(4, 0);
+      const jC = addJoint(8, 0); jC.support = "roller_h";
+      const jD = addJoint(2, 3);
+      const jE = addJoint(6, 3); jE.fy = -60;
+
+      addMember(jA.id, jC.id);
+      addMember(jD.id, jE.id);
+      addMember(jA.id, jD.id);
+      addMember(jD.id, jB.id);
+      addMember(jB.id, jE.id);
+      addMember(jE.id, jC.id);
+
+      solveTruss();
+    });
+
+    document.getElementById("btn-preset-mod-warren").addEventListener("click", () => {
+      clearAll();
+      const jA = addJoint(0, 0); jA.support = "pin";
+      const jB = addJoint(3, 0);
+      const jC = addJoint(6, 0); jC.fy = -50;
+      const jD = addJoint(9, 0);
+      const jE = addJoint(12, 0); jE.support = "roller_h";
+
+      const jF = addJoint(1.5, 2.5);
+      const jG = addJoint(4.5, 2.5);
+      const jH = addJoint(7.5, 2.5);
+      const jI = addJoint(10.5, 2.5);
+
+      addMember(jA.id, jE.id); // Bottom Chord (auto-subdivided)
+      addMember(jF.id, jI.id); // Top Chord (auto-subdivided)
+      // Diagonals
+      addMember(jA.id, jF.id); addMember(jF.id, jB.id);
+      addMember(jB.id, jG.id); addMember(jG.id, jC.id);
+      addMember(jC.id, jH.id); addMember(jH.id, jD.id);
+      addMember(jD.id, jI.id); addMember(jI.id, jE.id);
+      // Vertical Suspenders
+      addMember(jF.id, jB.id);
+      addMember(jG.id, jC.id);
+      addMember(jH.id, jD.id);
+
+      solveTruss();
+    });
+
+    document.getElementById("btn-preset-pratt").addEventListener("click", () => {
+      clearAll();
+      const jA = addJoint(0, 0); jA.support = "pin";
+      const jB = addJoint(3, 0); jB.fy = -40;
+      const jC = addJoint(6, 0); jC.fy = -40;
+      const jD = addJoint(9, 0); jD.support = "roller_h";
+
+      const jE = addJoint(3, 3);
+      const jF = addJoint(6, 3);
+
+      addMember(jA.id, jD.id);
+      addMember(jE.id, jF.id);
+      addMember(jA.id, jE.id);
+      addMember(jB.id, jE.id);
+      addMember(jB.id, jF.id); // Diagonal slopes DOWN to center
+      addMember(jC.id, jF.id);
+      addMember(jD.id, jF.id);
+
+      solveTruss();
+    });
+
+    document.getElementById("btn-preset-howe").addEventListener("click", () => {
+      clearAll();
+      const jA = addJoint(0, 0); jA.support = "pin";
+      const jB = addJoint(3, 0); jB.fy = -40;
+      const jC = addJoint(6, 0); jC.fy = -40;
+      const jD = addJoint(9, 0); jD.fy = -40;
+      const jE = addJoint(12, 0); jE.support = "roller_h";
+
+      const jF = addJoint(3, 3);
+      const jG = addJoint(6, 3);
+      const jH = addJoint(9, 3);
+
+      addMember(jA.id, jE.id); // Bottom chord
+      addMember(jF.id, jH.id); // Top chord
+      addMember(jA.id, jF.id); addMember(jE.id, jH.id); // End posts
+      addMember(jB.id, jF.id); addMember(jC.id, jG.id); addMember(jD.id, jH.id); // Verticals
+      // Diagonals slope UP toward center node G
+      addMember(jB.id, jG.id);
+      addMember(jD.id, jG.id);
+
+      solveTruss();
+    });
+
+    function clearAll() {
+      state.joints = [];
+      state.members = [];
+      state.selectedJointId = null;
+      state.memberStartJointId = null;
+      state.solved = false;
+      nextJointId = 0;
+      nextMemberId = 0;
+      cardResults.style.display = "none";
+      updateUI();
+      render();
+    }
+
+    document.getElementById("btn-clear-all").addEventListener("click", clearAll);
+
+    document.getElementById("btn-recenter").addEventListener("click", () => {
+      state.view.panX = 60; state.view.panY = -60; state.view.zoom = 42;
+      labelZoom.textContent = "100%";
+      render();
+    });
+
+    document.getElementById("btn-zoom-in").addEventListener("click", () => {
+      state.view.zoom = Math.min(120, state.view.zoom * 1.2);
+      labelZoom.textContent = `${Math.round((state.view.zoom / 42) * 100)}%`;
+      render();
+    });
+
+    document.getElementById("btn-zoom-out").addEventListener("click", () => {
+      state.view.zoom = Math.max(15, state.view.zoom * 0.8);
+      labelZoom.textContent = `${Math.round((state.view.zoom / 42) * 100)}%`;
+      render();
+    });
+
+    window.addEventListener("resize", () => {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render();
+    });
+
+    // Boot Initializer
+    window.dispatchEvent(new Event("resize"));
+    document.getElementById("btn-preset-mod-warren").click();
+  </script>
+</body>
+</html>
