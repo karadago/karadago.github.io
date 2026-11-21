@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Euler Buckling & Yielding Analyzer</title>
+  <style>
+    :root {
+      --bg-color: #f8fafc;
+      --sidebar-bg: #ffffff;
+      --border-color: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --warning: #d97706;
+      --purple: #7c3aed;
+      --teal: #0d9488;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    /* Main Canvas Workspace */
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: #ffffff;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Floating Viewport Controls */
+    .viewport-overlay {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(8px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      font-size: 12px;
+      align-items: center;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .mode-pill {
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #f1f5f9;
+      color: var(--text-main);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 12px;
+    }
+
+    .mode-pill:hover { background: #e2e8f0; }
+
+    .mode-pill.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary-hover);
+    }
+
+    .preset-btn {
+      background: #fdf4ff;
+      border-color: #d8b4fe;
+      color: #7e22ce;
+      font-weight: 700;
+    }
+    .preset-btn:hover { background: #f3e8ff; }
+
+    /* Sidebar Panel */
+    #sidebar {
+      width: 490px;
+      min-width: 430px;
+      background: var(--sidebar-bg);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.03);
+      z-index: 20;
+    }
+
+    .sidebar-header {
+      padding: 15px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .sidebar-header h1 {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 13px;
+    }
+
+    /* Cards */
+    .card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      font-size: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .form-group.full { grid-column: span 2; }
+
+    label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .input-unit-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .input-unit-row input {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .input-unit-row select {
+      width: 74px;
+      flex-shrink: 0;
+      background: #f1f5f9;
+      font-weight: 600;
+      color: #334155;
+    }
+
+    input[type="number"], select {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 4px;
+      font-size: 12.5px;
+      background: #ffffff;
+      color: var(--text-main);
+      outline: none;
+    }
+
+    input[type="number"]:focus, select:focus {
+      border-color: var(--primary);
+    }
+
+    /* Verdict & Status Banners */
+    .verdict-box {
+      border-radius: 8px;
+      padding: 12px 14px;
+      border: 1.5px solid;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .verdict-buckling {
+      background: #fef2f2;
+      border-color: #fca5a5;
+      color: #991b1b;
+    }
+
+    .verdict-yielding {
+      background: #fffbeb;
+      border-color: #fcd34d;
+      color: #92400e;
+    }
+
+    .verdict-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .verdict-sub {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    /* Load Check Status */
+    .load-status-pill {
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-safe {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+
+    .status-fail {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+    }
+
+    /* Math Results Table */
+    .math-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+
+    .math-table td { padding: 4px 0; }
+    .math-table td:nth-child(1) { color: var(--text-muted); }
+    .math-table td:nth-child(2) {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    /* Slenderness Chart Canvas */
+    #curve-canvas {
+      width: 100%;
+      height: 135px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Main Canvas Workspace -->
+  <div id="canvas-container">
+    <div class="viewport-overlay">
+      <button class="mode-pill active" id="btn-mode-governing">🎬 Animate Governing Failure</button>
+      <button class="mode-pill" id="btn-mode-applied">⚖️ Test Applied Load (P)</button>
+      <span style="border-left: 1px solid #cbd5e1; height: 18px; margin: 0 2px;"></span>
+      <button class="mode-pill preset-btn" id="btn-preset-slender">🎲 Slender ID Strut (Buckles)</button>
+      <button class="mode-pill preset-btn" id="btn-preset-stocky">🎲 Stocky Column (Crushes)</button>
+      <button class="mode-pill preset-btn" id="btn-preset-iso">🎲 Isotropic Tube (Ix = Iy)</button>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <!-- Right Control & Analysis Sidebar -->
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>Buckling & Yield Analyzer</h1>
+      <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 3px 7px; border-radius: 5px; font-weight: 700;">Euler & Strength</span>
+    </div>
+
+    <div class="sidebar-content">
+
+      <!-- 1. Material Selection -->
+      <div class="card">
+        <span class="card-title">
+          <span>1. Material Properties</span>
+          <span style="font-size: 10px; text-transform: none; color: var(--primary);">Architecture & Industrial Design</span>
+        </span>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Select Material Preset</label>
+            <select id="material-select">
+              <optgroup label="Metals (Architecture & Industrial Design)">
+                <option value="steel_a36">Structural Steel (A36 / S235)</option>
+                <option value="steel_s355">High-Strength Steel (S355 / 4140)</option>
+                <option value="stainless_304">Stainless Steel (304 — ID & Facades)</option>
+                <option value="alu_6061">Aluminum Alloy (6061-T6 — Frames & ID)</option>
+                <option value="titanium">Titanium Alloy (Ti-6Al-4V — Lightweight ID)</option>
+                <option value="brass">Brass (C36000 — Hardware & ID)</option>
+              </optgroup>
+              <optgroup label="Polymers & Composites (Industrial Design)">
+                <option value="polycarbonate">Polycarbonate (PC — Transparent/Tough ID)</option>
+                <option value="abs">ABS Plastic (3D Print / Molded Parts)</option>
+                <option value="acrylic">Acrylic / PMMA (Plexiglas Models)</option>
+                <option value="nylon">Nylon 6/6 (PA66 — Mechanical Parts)</option>
+                <option value="cfrp">Carbon Fiber Composite (CFRP Tubes)</option>
+              </optgroup>
+              <optgroup label="Timber, Natural & Masonry (Architecture & Furniture)">
+                <option value="timber">Structural Softwood Timber (C24 / Pine)</option>
+                <option value="hardwood">Hardwood / Oak / Beech (Furniture & ID)</option>
+                <option value="bamboo">Structural Bamboo (Moso — Sustainable ID/Arch)</option>
+                <option value="concrete">Normal-Strength Concrete (C30/37)</option>
+              </optgroup>
+              <optgroup label="User Defined">
+                <option value="custom">Custom Material Properties</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Young's Modulus E (GPa)</label>
+            <input type="number" id="input-E" value="200" step="0.5" min="0.01">
+          </div>
+          <div class="form-group">
+            <label>Yield / Crush Strength σ<sub>y</sub> (MPa)</label>
+            <input type="number" id="input-sy" value="250" step="5" min="0.1">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Cross-Section & Length Geometry -->
+      <div class="card">
+        <span class="card-title">2. Cross-Section & Member Geometry</span>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Cross-Section Area (A)</label>
+            <div class="input-unit-row">
+              <input type="number" id="input-A" value="2500" step="50" min="0.0001">
+              <select id="unit-A">
+                <option value="mm2" selected>mm²</option>
+                <option value="cm2">cm²</option>
+                <option value="m2">m²</option>
+                <option value="in2">in²</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Column Length (L)</label>
+            <div class="input-unit-row">
+              <input type="number" id="input-L" value="3.5" step="0.1" min="0.001">
+              <select id="unit-L">
+                <option value="mm">mm</option>
+                <option value="cm">cm</option>
+                <option value="m" selected>m</option>
+                <option value="in">in</option>
+                <option value="ft">ft</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Moment of Inertia I<sub>x</sub></label>
+            <div class="input-unit-row">
+              <input type="number" id="input-Ix" value="1800000" step="10000" min="0.0001">
+              <select id="unit-Ix">
+                <option value="mm4" selected>mm⁴</option>
+                <option value="cm4">cm⁴</option>
+                <option value="m4">m⁴</option>
+                <option value="in4">in⁴</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Moment of Inertia I<sub>y</sub></label>
+            <div class="input-unit-row">
+              <input type="number" id="input-Iy" value="650000" step="10000" min="0.0001">
+              <select id="unit-Iy">
+                <option value="mm4" selected>mm⁴</option>
+                <option value="cm4">cm⁴</option>
+                <option value="m4">m⁴</option>
+                <option value="in4">in⁴</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Boundary Conditions (End Supports)</label>
+            <select id="select-bc">
+              <option value="pinned_pinned" selected>Pinned – Pinned (K = 1.0)</option>
+              <option value="fixed_free">Fixed – Free / Flagpole (K = 2.0)</option>
+              <option value="fixed_pinned">Fixed – Pinned (K = 0.7)</option>
+              <option value="fixed_fixed">Fixed – Fixed (K = 0.5)</option>
+              <option value="guided_fixed">Guided – Fixed (K = 1.0)</option>
+              <option value="custom">Custom K Factor</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Effective Length Factor (K)</label>
+            <input type="number" id="input-K" value="1.0" step="0.05" min="0.1" max="5.0">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Applied Load Check -->
+      <div class="card">
+        <span class="card-title">3. Applied Axial Load Check</span>
+        <div class="form-grid">
+          <div class="form-group full">
+            <label>Compressive Load Applied (P<sub>applied</sub>)</label>
+            <div class="input-unit-row">
+              <input type="number" id="input-P" value="80" step="5" min="0">
+              <select id="unit-P">
+                <option value="N">N</option>
+                <option value="kN" selected>kN</option>
+                <option value="kgf">kgf</option>
+                <option value="lbf">lbf</option>
+                <option value="kip">kip</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="applied-status-box" class="load-status-pill status-safe">
+          <span id="applied-status-text">SAFE — Below Critical Capacity</span>
+          <span id="applied-fos-text">FoS: 1.31</span>
+        </div>
+      </div>
+
+      <!-- 4. Governing Failure Mode Verdict -->
+      <div id="verdict-card" class="verdict-box verdict-buckling">
+        <div class="verdict-title">
+          <span id="verdict-headline">⚠️ ELASTIC BUCKLING GOVERNS</span>
+          <span id="verdict-axis-tag" style="font-size: 11px; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.08);">Weak Axis: Y-Y</span>
+        </div>
+        <div id="verdict-explanation" class="verdict-sub">
+          The column reaches Euler instability before the material yields.
+        </div>
+      </div>
+
+      <!-- 5. Analytical Results & Slenderness Curve -->
+      <div class="card">
+        <span class="card-title">4. Critical Loads & Slenderness Analysis</span>
+        <table class="math-table">
+          <tr>
+            <td>Euler Critical Buckling Load (P<sub>cr</sub>):</td>
+            <td id="res-pcr" style="color: var(--danger);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Material Yield / Crush Load (P<sub>yield</sub>):</td>
+            <td id="res-pyield" style="color: var(--warning);">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Governing Capacity (P<sub>max</sub>):</td>
+            <td id="res-pmax" style="color: var(--primary); font-weight: 800;">0.00 kN</td>
+          </tr>
+          <tr>
+            <td>Governing Inertia (I<sub>min</sub>) & Axis:</td>
+            <td id="res-imin">0.00 mm⁴</td>
+          </tr>
+          <tr>
+            <td>Effective Length (L<sub>e</sub> = K·L):</td>
+            <td id="res-le">3.50 m</td>
+          </tr>
+          <tr>
+            <td>Slenderness Ratio (λ = K·L / r<sub>min</sub>):</td>
+            <td id="res-lambda">0.0</td>
+          </tr>
+          <tr>
+            <td>Critical Transition Slenderness (λ<sub>c</sub>):</td>
+            <td id="res-lambda-c">0.0</td>
+          </tr>
+        </table>
+
+        <canvas id="curve-canvas"></canvas>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // --- Material Database (Architecture & Industrial Design) ---
+    const MATERIALS = {
+      steel_a36:     { name: "Structural Steel (A36 / S235)", E: 200,   sy: 250 },
+      steel_s355:    { name: "High-Strength Steel (S355)",    E: 205,   sy: 355 },
+      stainless_304: { name: "Stainless Steel (304)",         E: 193,   sy: 215 },
+      alu_6061:      { name: "Aluminum Alloy (6061-T6)",      E: 68.9,  sy: 276 },
+      titanium:      { name: "Titanium Alloy (Ti-6Al-4V)",    E: 114,   sy: 880 },
+      brass:         { name: "Brass (C36000)",                E: 97,    sy: 310 },
+      polycarbonate: { name: "Polycarbonate (PC)",            E: 2.4,   sy: 62  },
+      abs:           { name: "ABS Plastic",                   E: 2.1,   sy: 40  },
+      acrylic:       { name: "Acrylic / PMMA (Plexiglas)",    E: 3.0,   sy: 70  },
+      nylon:         { name: "Nylon 6/6 (PA66)",              E: 2.8,   sy: 75  },
+      cfrp:          { name: "Carbon Fiber (CFRP)",           E: 135,   sy: 600 },
+      timber:        { name: "Structural Timber (C24)",       E: 11.0,  sy: 21  },
+      hardwood:      { name: "Hardwood (Oak / Beech)",        E: 13.0,  sy: 45  },
+      bamboo:        { name: "Structural Bamboo (Moso)",      E: 15.0,  sy: 55  },
+      concrete:      { name: "Concrete (C30/37)",             E: 32.0,  sy: 30  }
+    };
+
+    const BC_K_VALUES = {
+      pinned_pinned: 1.0,
+      fixed_free:    2.0,
+      fixed_pinned:  0.7,
+      fixed_fixed:   0.5,
+      guided_fixed:  1.0
+    };
+
+    // Unit conversion factors to SI base units (m, m^2, m^4, N)
+    const TO_M2 = { mm2: 1e-6, cm2: 1e-4, m2: 1, in2: 0.00064516 };
+    const TO_M4 = { mm4: 1e-12, cm4: 1e-8, m4: 1, in4: 4.162314256e-7 };
+    const TO_M  = { mm: 1e-3, cm: 1e-2, m: 1, in: 0.0254, ft: 0.3048 };
+    const TO_N  = { N: 1, kN: 1000, kgf: 9.80665, lbf: 4.4482216, kip: 4448.2216 };
+
+    // --- Application State ---
+    let state = {
+      animMode: "governing", // 'governing' | 'applied'
+      E_GPa: 200,
+      sy_MPa: 250,
+      A_val: 2500, A_unit: "mm2",
+      Ix_val: 1800000, Ix_unit: "mm4",
+      Iy_val: 650000, Iy_unit: "mm4",
+      L_val: 3.5, L_unit: "m",
+      bc: "pinned_pinned",
+      K: 1.0,
+      P_val: 80, P_unit: "kN",
+
+      // Computed SI results
+      calc: {
+        A_m2: 0,
+        Ix_m4: 0,
+        Iy_m4: 0,
+        Imin_m4: 0,
+        L_m: 0,
+        Le_m: 0,
+        P_app_N: 0,
+        P_cr_N: 0,
+        P_yield_N: 0,
+        P_limit_N: 0,
+        rmin_m: 0,
+        lambda: 0,
+        lambda_c: 0,
+        governs: "buckling", // 'buckling' | 'yielding'
+        weakAxis: "Y",       // 'X' | 'Y' | 'ISO'
+        appliedFailed: false,
+        fos: 1.0
+      }
+    };
+
+    // DOM Elements
+    const stageCanvas = document.getElementById("stage");
+    const ctx = stageCanvas.getContext("2d");
+    const container = document.getElementById("canvas-container");
+
+    const curveCanvas = document.getElementById("curve-canvas");
+    const curveCtx = curveCanvas.getContext("2d");
+
+    const matSelect = document.getElementById("material-select");
+    const inputE = document.getElementById("input-E");
+    const inputSy = document.getElementById("input-sy");
+    const inputA = document.getElementById("input-A");
+    const unitA = document.getElementById("unit-A");
+    const inputL = document.getElementById("input-L");
+    const unitL = document.getElementById("unit-L");
+    const inputIx = document.getElementById("input-Ix");
+    const unitIx = document.getElementById("unit-Ix");
+    const inputIy = document.getElementById("input-Iy");
+    const unitIy = document.getElementById("unit-Iy");
+    const selectBC = document.getElementById("select-bc");
+    const inputK = document.getElementById("input-K");
+    const inputP = document.getElementById("input-P");
+    const unitP = document.getElementById("unit-P");
+
+    // --- Core Structural Physics Engine ---
+    function recalculate() {
+      const E_Pa = Math.max(1e4, (parseFloat(inputE.value) || 0.1) * 1e9);
+      const sy_Pa = Math.max(1e3, (parseFloat(inputSy.value) || 0.1) * 1e6);
+
+      const A_m2 = Math.max(1e-12, (parseFloat(inputA.value) || 0.001) * TO_M2[unitA.value]);
+      const Ix_m4 = Math.max(1e-20, (parseFloat(inputIx.value) || 0.001) * TO_M4[unitIx.value]);
+      const Iy_m4 = Math.max(1e-20, (parseFloat(inputIy.value) || 0.001) * TO_M4[unitIy.value]);
+      const L_m = Math.max(1e-5, (parseFloat(inputL.value) || 0.001) * TO_M[unitL.value]);
+      const K = Math.max(0.05, parseFloat(inputK.value) || 1.0);
+      const P_app_N = Math.max(0, (parseFloat(inputP.value) || 0) * TO_N[unitP.value]);
+
+      const Le_m = K * L_m;
+
+      // Determine Weak Axis & I_min
+      let Imin_m4 = Math.min(Ix_m4, Iy_m4);
+      let weakAxis = "ISO";
+      const relDiff = Math.abs(Ix_m4 - Iy_m4) / Math.max(Ix_m4, Iy_m4);
+
+      if (relDiff > 0.005) {
+        weakAxis = Ix_m4 < Iy_m4 ? "X" : "Y";
+      }
+
+      // Euler Critical Buckling Load: P_cr = pi^2 * E * I_min / (K * L)^2
+      const P_cr_N = (Math.PI * Math.PI * E_Pa * Imin_m4) / (Le_m * Le_m);
+
+      // Material Yield / Crushing Load: P_yield = sigma_y * A
+      const P_yield_N = sy_Pa * A_m2;
+
+      // Slenderness Ratio
+      const rmin_m = Math.sqrt(Imin_m4 / A_m2);
+      const lambda = Le_m / rmin_m;
+      const lambda_c = Math.PI * Math.sqrt(E_Pa / sy_Pa);
+
+      // Governing Failure Mode
+      const governs = P_cr_N < P_yield_N ? "buckling" : "yielding";
+      const P_limit_N = Math.min(P_cr_N, P_yield_N);
+
+      const appliedFailed = P_app_N >= P_limit_N;
+      const fos = P_app_N > 0 ? (P_limit_N / P_app_N) : Infinity;
+
+      state.calc = {
+        E_Pa, sy_Pa, A_m2, Ix_m4, Iy_m4, Imin_m4, L_m, Le_m,
+        P_app_N, P_cr_N, P_yield_N, P_limit_N, rmin_m, lambda, lambda_c,
+        governs, weakAxis, appliedFailed, fos
+      };
+
+      updateSidebarUI();
+      drawSlendernessCurve();
+    }
+
+    function formatForce(newtons) {
+      if (newtons >= 1e6) {
+        return `${(newtons / 1e6).toFixed(2)} MN (${(newtons / 1e3).toFixed(1)} kN)`;
+      } else if (newtons >= 1000) {
+        return `${(newtons / 1000).toFixed(2)} kN`;
+      } else {
+        return `${newtons.toFixed(2)} N`;
+      }
+    }
+
+    function updateSidebarUI() {
+      const c = state.calc;
+
+      // Results table
+      document.getElementById("res-pcr").textContent = formatForce(c.P_cr_N);
+      document.getElementById("res-pyield").textContent = formatForce(c.P_yield_N);
+      document.getElementById("res-pmax").textContent = formatForce(c.P_limit_N);
+
+      const imin_mm4 = c.Imin_m4 * 1e12;
+      const iminStr = imin_mm4 >= 1e6 ? imin_mm4.toExponential(2) : imin_mm4.toFixed(1);
+      const axisLabel = c.weakAxis === "ISO" ? "Isotropic (Ix = Iy)" : `About ${c.weakAxis}-${c.weakAxis} axis`;
+      document.getElementById("res-imin").textContent = `${iminStr} mm⁴ (${axisLabel})`;
+
+      document.getElementById("res-le").textContent = c.Le_m >= 1 ? `${c.Le_m.toFixed(2)} m` : `${(c.Le_m * 1000).toFixed(1)} mm`;
+      document.getElementById("res-lambda").textContent = c.lambda.toFixed(1);
+      document.getElementById("res-lambda-c").textContent = c.lambda_c.toFixed(1);
+
+      // Verdict Card
+      const verdictCard = document.getElementById("verdict-card");
+      const verdictHeadline = document.getElementById("verdict-headline");
+      const verdictAxisTag = document.getElementById("verdict-axis-tag");
+      const verdictExplanation = document.getElementById("verdict-explanation");
+
+      if (c.governs === "buckling") {
+        verdictCard.className = "verdict-box verdict-buckling";
+        verdictHeadline.textContent = "⚠️ ELASTIC BUCKLING GOVERNS";
+
+        if (c.weakAxis === "ISO") {
+          verdictAxisTag.textContent = "Isotropic: Ix = Iy (360°)";
+          verdictExplanation.innerHTML =
+            `Column is slender (<strong>λ = ${c.lambda.toFixed(1)} > λ<sub>c</sub> = ${c.lambda_c.toFixed(1)}</strong>). ` +
+            `Buckling occurs at <strong>${formatForce(c.P_cr_N)}</strong> before yielding (${formatForce(c.P_yield_N)}). ` +
+            `Because <strong>I<sub>x</sub> = I<sub>y</sub></strong>, the section has equal stiffness in all directions and can buckle radially in any plane.`;
+        } else {
+          const deflectDir = c.weakAxis === "Y" ? "X-direction (left/right)" : "Y-direction (front/back)";
+          verdictAxisTag.textContent = `Buckles About ${c.weakAxis}-${c.weakAxis}`;
+          verdictExplanation.innerHTML =
+            `Column is slender (<strong>λ = ${c.lambda.toFixed(1)} > λ<sub>c</sub> = ${c.lambda_c.toFixed(1)}</strong>). ` +
+            `Buckling occurs at <strong>${formatForce(c.P_cr_N)}</strong> before yielding (${formatForce(c.P_yield_N)}). ` +
+            `Since <strong>I<sub>${c.weakAxis.toLowerCase()}</sub> < I<sub>${c.weakAxis === "Y" ? "x" : "y"}</sub></strong>, it bends about the <strong>${c.weakAxis}-${c.weakAxis} axis</strong> (deflecting in the ${deflectDir}).`;
+        }
+      } else {
+        verdictCard.className = "verdict-box verdict-yielding";
+        verdictHeadline.textContent = "🧱 MATERIAL YIELD / CRUSHING GOVERNS";
+        verdictAxisTag.textContent = "Stocky Member";
+        verdictExplanation.innerHTML =
+          `Column is stocky (<strong>λ = ${c.lambda.toFixed(1)} ≤ λ<sub>c</sub> = ${c.lambda_c.toFixed(1)}</strong>). ` +
+          `Material reaches compressive yield/crushing strength at <strong>${formatForce(c.P_yield_N)}</strong> before Euler buckling (${formatForce(c.P_cr_N)}) can develop.`;
+      }
+
+      // Applied Load Status Pill
+      const statusBox = document.getElementById("applied-status-box");
+      const statusText = document.getElementById("applied-status-text");
+      const fosText = document.getElementById("applied-fos-text");
+
+      if (c.appliedFailed) {
+        statusBox.className = "load-status-pill status-fail";
+        const failType = c.governs === "buckling" ? "BUCKLING OCCURS" : "CRUSHING / YIELD OCCURS";
+        statusText.textContent = `❌ ${failType} under P_applied!`;
+        fosText.textContent = `Utilization: ${((c.P_app_N / c.P_limit_N) * 100).toFixed(0)}%`;
+      } else {
+        statusBox.className = "load-status-pill status-safe";
+        statusText.textContent = "✅ SAFE — Column Remains Stable";
+        fosText.textContent = c.fos === Infinity ? "FoS: ∞" : `FoS: ${c.fos.toFixed(2)}`;
+      }
+    }
+
+    // --- Slenderness Curve Mini-Plot (Stress vs Slenderness Lambda) ---
+    function drawSlendernessCurve() {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = curveCanvas.getBoundingClientRect();
+      curveCanvas.width = rect.width * dpr;
+      curveCanvas.height = rect.height * dpr;
+      curveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const w = rect.width;
+      const h = rect.height;
+      curveCtx.clearRect(0, 0, w, h);
+
+      const c = state.calc;
+      const padL = 38, padR = 16, padT = 16, padB = 24;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+
+      const maxLambda = Math.max(c.lambda * 1.35, c.lambda_c * 2.0, 120);
+      const maxStress = c.sy_Pa * 1.25;
+
+      const toX = (lam) => padL + (lam / maxLambda) * plotW;
+      const toY = (sig) => padT + plotH - (Math.min(sig, maxStress) / maxStress) * plotH;
+
+      // Axes
+      curveCtx.strokeStyle = "#94a3b8";
+      curveCtx.lineWidth = 1;
+      curveCtx.beginPath();
+      curveCtx.moveTo(padL, padT);
+      curveCtx.lineTo(padL, padT + plotH);
+      curveCtx.lineTo(padL + plotW, padT + plotH);
+      curveCtx.stroke();
+
+      // Yield Plateau Line (0 to lambda_c)
+      const xCrit = toX(c.lambda_c);
+      const yYield = toY(c.sy_Pa);
+
+      curveCtx.strokeStyle = "#d97706";
+      curveCtx.lineWidth = 2.5;
+      curveCtx.beginPath();
+      curveCtx.moveTo(padL, yYield);
+      curveCtx.lineTo(Math.min(padL + plotW, xCrit), yYield);
+      curveCtx.stroke();
+
+      // Euler Hyperbola Curve (lambda_c to maxLambda)
+      curveCtx.strokeStyle = "#dc2626";
+      curveCtx.lineWidth = 2.5;
+      curveCtx.beginPath();
+      let started = false;
+      for (let lam = c.lambda_c; lam <= maxLambda; lam += maxLambda / 80) {
+        const sigCr = (Math.PI * Math.PI * c.E_Pa) / (lam * lam);
+        const px = toX(lam);
+        const py = toY(sigCr);
+        if (!started) { curveCtx.moveTo(px, py); started = true; }
+        else curveCtx.lineTo(px, py);
+      }
+      curveCtx.stroke();
+
+      // Vertical dashed line at lambda_c
+      if (xCrit < padL + plotW) {
+        curveCtx.strokeStyle = "#cbd5e1";
+        curveCtx.setLineDash([3, 3]);
+        curveCtx.beginPath();
+        curveCtx.moveTo(xCrit, padT);
+        curveCtx.lineTo(xCrit, padT + plotH);
+        curveCtx.stroke();
+        curveCtx.setLineDash([]);
+
+        curveCtx.fillStyle = "#64748b";
+        curveCtx.font = "bold 9.5px sans-serif";
+        curveCtx.fillText(`λc=${c.lambda_c.toFixed(0)}`, xCrit - 14, padT + plotH + 12);
+      }
+
+      // Current Column Operating Point
+      const curStressLimit = Math.min(c.sy_Pa, (Math.PI * Math.PI * c.E_Pa) / (c.lambda * c.lambda));
+      const curX = toX(Math.min(c.lambda, maxLambda));
+      const curY = toY(curStressLimit);
+
+      curveCtx.beginPath();
+      curveCtx.arc(curX, curY, 5.5, 0, 2 * Math.PI);
+      curveCtx.fillStyle = "#2563eb";
+      curveCtx.fill();
+      curveCtx.strokeStyle = "#ffffff";
+      curveCtx.lineWidth = 1.5;
+      curveCtx.stroke();
+
+      // Labels
+      curveCtx.fillStyle = "#475569";
+      curveCtx.font = "bold 9.5px sans-serif";
+      curveCtx.fillText("σ_cr", 6, padT + 8);
+      curveCtx.fillText("Slenderness λ", padL + plotW - 64, padT + plotH + 18);
+      curveCtx.fillStyle = "#2563eb";
+      curveCtx.fillText("Your Column", Math.min(curX + 8, padL + plotW - 60), Math.max(curY - 5, padT + 10));
+    }
+
+    // --- Main Animation & Rendering Engine ---
+    let animTime = 0;
+
+    // Exact analytical Euler buckling mode shape phi(xi) for xi in [0, 1]
+    function getBucklingModeShape(xi, bc) {
+      if (bc === "pinned_pinned" || bc === "custom") {
+        return Math.sin(Math.PI * xi);
+      } else if (bc === "fixed_free") {
+        return 1 - Math.cos((Math.PI / 2) * xi);
+      } else if (bc === "fixed_pinned") {
+        const alpha = 4.4934094579;
+        const val = Math.sin(alpha * xi) - alpha * Math.cos(alpha * xi) + alpha * (1 - xi);
+        return val / 6.238;
+      } else if (bc === "fixed_fixed") {
+        return 0.5 * (1 - Math.cos(2 * Math.PI * xi));
+      } else if (bc === "guided_fixed") {
+        return 0.5 * (1 - Math.cos(Math.PI * xi));
+      }
+      return Math.sin(Math.PI * xi);
+    }
+
+    function renderLoop(timestamp) {
+      animTime = timestamp * 0.001; // Seconds
+      drawMainStage();
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawMainStage() {
+      const rect = container.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      if (stageCanvas.width !== Math.round(rect.width * dpr) || stageCanvas.height !== Math.round(rect.height * dpr)) {
+        stageCanvas.width = rect.width * dpr;
+        stageCanvas.height = rect.height * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const w = rect.width;
+      const h = rect.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Background subtle engineering grid
+      drawGrid(w, h);
+
+      const c = state.calc;
+      const isAppliedMode = state.animMode === "applied";
+
+      // Determine what animation state to display
+      let activeBehavior = "buckling"; // 'buckling' | 'crushing' | 'safe'
+      if (isAppliedMode) {
+        if (!c.appliedFailed) activeBehavior = "safe";
+        else activeBehavior = c.governs === "buckling" ? "buckling" : "crushing";
+      } else {
+        activeBehavior = c.governs === "buckling" ? "buckling" : "crushing";
+      }
+
+      // Layout coordinates: Left/Center for Column Elevation, Right for Cross-Section Axis HUD
+      const colCenterX = w * 0.36;
+      const colBottomY = h * 0.80;
+      const colNomHeight = Math.min(h * 0.54, 380);
+      const colNomWidth = c.governs === "yielding" ? 44 : 24;
+
+      // Animation oscillator
+      const cycle = Math.sin(animTime * 2.4); // -1 to 1
+      const uniCycle = 0.5 * (1 - Math.cos(animTime * 2.4)); // 0 to 1 smooth pulse
+
+      let latAmp = 0;
+      let axialShorten = 0;
+      let bulgeAmp = 0;
+      let isoAngle = animTime * 1.1; // For Ix = Iy 360-degree rotation
+
+      if (activeBehavior === "buckling") {
+        latAmp = 68 * cycle;
+        axialShorten = 10 * Math.abs(cycle);
+      } else if (activeBehavior === "crushing") {
+        axialShorten = 42 * uniCycle;
+        bulgeAmp = 18 * uniCycle;
+      } else if (activeBehavior === "safe") {
+        const loadRatio = c.P_limit_N > 0 ? Math.min(0.95, c.P_app_N / c.P_limit_N) : 0;
+        axialShorten = 12 * loadRatio;
+        // Damped micro-perturbation proving elastic stability
+        const dampEnv = Math.exp(-((animTime % 3.0) * 1.8));
+        latAmp = 10 * loadRatio * dampEnv * Math.sin(animTime * 14);
+      }
+
+      // For isotropic buckling (Ix = Iy), project the 360-degree revolving buckle onto 2D elevation
+      let effectiveLatAmp = latAmp;
+      let depthScale = 1.0;
+      if (activeBehavior === "buckling" && c.weakAxis === "ISO") {
+        effectiveLatAmp = 68 * Math.cos(isoAngle);
+        depthScale = 1 + 0.16 * Math.sin(isoAngle); // Subtle 3D foreshortening effect
+      }
+
+      const currentTopY = colBottomY - (colNomHeight - axialShorten);
+
+      // 1. Draw Reference Undeformed Centerline (Dashed)
+      ctx.save();
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(colCenterX, colBottomY);
+      ctx.lineTo(colCenterX, colBottomY - colNomHeight);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // 2. Draw Column Body (Segmented polygon for smooth bending or barreling)
+      drawColumnBody(
+        colCenterX, colBottomY, colNomHeight - axialShorten,
+        colNomWidth, effectiveLatAmp, bulgeAmp, depthScale, activeBehavior
+      );
+
+      // 3. Draw Boundary Conditions (Top & Bottom Supports)
+      const topX = colCenterX + effectiveLatAmp * getBucklingModeShape(1.0, state.bc);
+      drawBoundarySupports(colCenterX, colBottomY, topX, currentTopY, state.bc);
+
+      // 4. Draw Top Applied Load Arrow & Label
+      drawLoadHeader(topX, currentTopY, activeBehavior, isAppliedMode);
+
+      // 5. Draw Height Dimension Marker (L and K*L)
+      drawHeightDimension(colCenterX - 95, colBottomY, colBottomY - colNomHeight);
+
+      // 6. Draw Right-Side Cross-Section & Principal Axis HUD
+      drawCrossSectionHUD(w * 0.76, h * 0.48, activeBehavior, isoAngle);
+    }
+
+    function drawGrid(w, h) {
+      const step = 28;
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "#f1f5f9";
+      ctx.beginPath();
+      for (let x = 0; x < w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+      for (let y = 0; y < h; y += step) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+      ctx.stroke();
+    }
+
+    function drawColumnBody(baseX, baseY, height, baseWidth, latAmp, bulgeAmp, depthScale, behavior) {
+      const steps = 60;
+      const leftPts = [];
+      const rightPts = [];
+
+      for (let i = 0; i <= steps; i++) {
+        const xi = i / steps;
+        const y = baseY - xi * height;
+        const modeOffset = latAmp * getBucklingModeShape(xi, state.bc);
+
+        // Plastic barreling profile (localized around mid-height for crushing)
+        const barrelProfile = Math.sin(Math.PI * xi);
+        const halfW = ((baseWidth / 2) + bulgeAmp * Math.pow(barrelProfile, 1.5)) * (1 + (depthScale - 1) * barrelProfile);
+
+        leftPts.push({ x: baseX + modeOffset - halfW, y });
+        rightPts.push({ x: baseX + modeOffset + halfW, y });
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(leftPts[0].x, leftPts[0].y);
+      for (let i = 1; i <= steps; i++) ctx.lineTo(leftPts[i].x, leftPts[i].y);
+      for (let i = steps; i >= 0; i--) ctx.lineTo(rightPts[i].x, rightPts[i].y);
+      ctx.closePath();
+
+      // Fill gradient based on behavior
+      if (behavior === "buckling") {
+        ctx.fillStyle = "rgba(220, 38, 38, 0.16)";
+        ctx.strokeStyle = "#dc2626";
+      } else if (behavior === "crushing") {
+        ctx.fillStyle = "rgba(217, 119, 6, 0.24)";
+        ctx.strokeStyle = "#d97706";
+      } else {
+        ctx.fillStyle = "rgba(22, 163, 74, 0.16)";
+        ctx.strokeStyle = "#16a34a";
+      }
+      ctx.lineWidth = 2.5;
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw Deformed Centerline
+      ctx.strokeStyle = behavior === "buckling" ? "#dc2626" : behavior === "crushing" ? "#b45309" : "#15803d";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const cx = (leftPts[i].x + rightPts[i].x) / 2;
+        const cy = leftPts[i].y;
+        if (i === 0) ctx.moveTo(cx, cy);
+        else ctx.lineTo(cx, cy);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // If crushing, draw 45-degree shear slip / yield bands at midsection!
+      if (behavior === "crushing" && bulgeAmp > 2) {
+        const midIdx = Math.floor(steps / 2);
+        const midY = leftPts[midIdx].y;
+        const halfW = (rightPts[midIdx].x - leftPts[midIdx].x) / 2;
+
+        ctx.strokeStyle = "rgba(185, 28, 28, 0.75)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(baseX - halfW + 4, midY - halfW * 0.8);
+        ctx.lineTo(baseX + halfW - 4, midY + halfW * 0.8);
+        ctx.moveTo(baseX + halfW - 4, midY - halfW * 0.8);
+        ctx.lineTo(baseX - halfW + 4, midY + halfW * 0.8);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawBoundarySupports(botX, botY, topX, topY, bc) {
+      ctx.save();
+
+      // Bottom Support
+      if (bc === "pinned_pinned" || bc === "custom") {
+        drawPinTriangle(botX, botY, false);
+      } else {
+        drawFixedSupport(botX, botY, false);
+      }
+
+      // Top Support
+      if (bc === "pinned_pinned" || bc === "fixed_pinned" || bc === "custom") {
+        drawPinTriangle(topX, topY, true);
+      } else if (bc === "fixed_fixed") {
+        drawFixedSupport(topX, topY, true);
+      } else if (bc === "guided_fixed") {
+        drawGuidedSupport(topX, topY);
+      }
+      // fixed_free has no top support
+
+      ctx.restore();
+    }
+
+    function drawPinTriangle(x, y, inverted) {
+      const dir = inverted ? -1 : 1;
+      ctx.fillStyle = "#64748b";
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 13, y + 18 * dir);
+      ctx.lineTo(x + 13, y + 18 * dir);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = "#334155";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 18, y + 19 * dir);
+      ctx.lineTo(x + 18, y + 19 * dir);
+      ctx.stroke();
+
+      // Pin circle
+      ctx.beginPath();
+      ctx.arc(x, y, 4.5, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawFixedSupport(x, y, inverted) {
+      const dir = inverted ? -1 : 1;
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(x - 26, y);
+      ctx.lineTo(x + 26, y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.5;
+      for (let i = -22; i <= 22; i += 8) {
+        ctx.beginPath();
+        ctx.moveTo(x + i, y);
+        ctx.lineTo(x + i - 6 * dir, y + 8 * dir);
+        ctx.stroke();
+      }
+    }
+
+    function drawGuidedSupport(x, y) {
+      drawFixedSupport(x, y, true);
+      // Rollers above guided block
+      ctx.fillStyle = "#64748b";
+      ctx.beginPath();
+      ctx.arc(x - 12, y - 12, 3.5, 0, 2 * Math.PI);
+      ctx.arc(x + 12, y - 12, 3.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+
+    function drawLoadHeader(topX, topY, behavior, isAppliedMode) {
+      const c = state.calc;
+      const arrowTopY = topY - 72;
+      const arrowTipY = topY - 22;
+
+      const color = behavior === "buckling" ? "#dc2626" : behavior === "crushing" ? "#d97706" : "#16a34a";
+
+      // Load Arrow
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 3.5;
+
+      ctx.beginPath();
+      ctx.moveTo(topX, arrowTopY);
+      ctx.lineTo(topX, arrowTipY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(topX, arrowTipY);
+      ctx.lineTo(topX - 7, arrowTipY - 12);
+      ctx.lineTo(topX + 7, arrowTipY - 12);
+      ctx.closePath();
+      ctx.fill();
+
+      // Load Label Pill
+      const loadLabel = isAppliedMode
+        ? `P_applied = ${formatForce(c.P_app_N)}`
+        : (behavior === "buckling" ? `P_cr = ${formatForce(c.P_cr_N)}` : `P_yield = ${formatForce(c.P_yield_N)}`);
+
+      drawPillBadge(loadLabel, topX, arrowTopY - 14, color);
+
+      // State Callout Badge next to column
+      let stateText = "";
+      if (behavior === "buckling") stateText = "ELASTIC BUCKLING!";
+      else if (behavior === "crushing") stateText = "PLASTIC CRUSHING!";
+      else stateText = "ELASTICALLY STABLE";
+
+      drawPillBadge(stateText, topX, arrowTopY - 38, color, true);
+      ctx.restore();
+    }
+
+    function drawHeightDimension(x, botY, topY) {
+      const c = state.calc;
+      ctx.save();
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.2;
+
+      ctx.beginPath();
+      ctx.moveTo(x - 6, botY); ctx.lineTo(x + 6, botY);
+      ctx.moveTo(x - 6, topY); ctx.lineTo(x + 6, topY);
+      ctx.moveTo(x, botY);     ctx.lineTo(x, topY);
+      ctx.stroke();
+
+      const lenText = c.L_m >= 1 ? `L = ${c.L_m.toFixed(2)} m` : `L = ${(c.L_m * 1000).toFixed(0)} mm`;
+      drawPillBadge(lenText, x, (botY + topY) / 2 - 10, "#334155");
+      drawPillBadge(`K = ${state.K.toFixed(2)}`, x, (botY + topY) / 2 + 12, "#7c3aed");
+      ctx.restore();
+    }
+
+    // --- Cross-Section & Principal Axis HUD (Right Side of Canvas) ---
+    function drawCrossSectionHUD(cx, cy, behavior, isoAngle) {
+      const c = state.calc;
+
+      ctx.save();
+
+      // Card container background on canvas
+      const boxW = 250;
+      const boxH = 310;
+      ctx.fillStyle = "rgba(248, 250, 252, 0.94)";
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(cx - boxW / 2, cy - boxH / 2, boxW, boxH, 10) : ctx.rect(cx - boxW / 2, cy - boxH / 2, boxW, boxH);
+      ctx.fill();
+      ctx.stroke();
+
+      // Title
+      ctx.fillStyle = "#334155";
+      ctx.font = "bold 11.5px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("CROSS-SECTION & BUCKLING AXIS", cx, cy - boxH / 2 + 22);
+
+      // Schematic Cross-Section Dimensions proportional to sqrt(Iy/Ix)
+      const aspect = Math.min(2.2, Math.max(0.45, Math.sqrt(c.Iy_m4 / c.Ix_m4)));
+      const baseDim = 66;
+      const secW = baseDim * Math.sqrt(aspect);
+      const secH = baseDim / Math.sqrt(aspect);
+
+      // Draw Principal Axes (X-X and Y-Y)
+      const axisLen = 84;
+      const xWeak = c.weakAxis === "X" || c.weakAxis === "ISO";
+      const yWeak = c.weakAxis === "Y" || c.weakAxis === "ISO";
+
+      // X-X Axis
+      ctx.strokeStyle = xWeak && behavior === "buckling" ? "#dc2626" : "#94a3b8";
+      ctx.lineWidth = xWeak && behavior === "buckling" ? 2.2 : 1.2;
+      ctx.setLineDash([5, 3]);
+      ctx.beginPath();
+      ctx.moveTo(cx - axisLen, cy);
+      ctx.lineTo(cx + axisLen, cy);
+      ctx.stroke();
+
+      // Y-Y Axis
+      ctx.strokeStyle = yWeak && behavior === "buckling" ? "#dc2626" : "#94a3b8";
+      ctx.lineWidth = yWeak && behavior === "buckling" ? 2.2 : 1.2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - axisLen);
+      ctx.lineTo(cx, cy + axisLen);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw Cross-Section Shape (Circle if ISO, Rectangle otherwise)
+      ctx.fillStyle = "rgba(37, 99, 235, 0.14)";
+      ctx.strokeStyle = "#1d4ed8";
+      ctx.lineWidth = 2;
+
+      if (c.weakAxis === "ISO") {
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseDim * 0.55, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+
+        // 360-degree omnidirectional buckling ring
+        if (behavior === "buckling") {
+          ctx.strokeStyle = "rgba(220, 38, 38, 0.55)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, 62, 0, 2 * Math.PI);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Rotating radial deflection vector showing any direction can buckle!
+          const rx = cx + 62 * Math.cos(isoAngle);
+          const ry = cy + 62 * Math.sin(isoAngle);
+          drawSimpleArrow(cx, cy, rx, ry, "#dc2626", 2.5);
+        }
+      } else {
+        ctx.beginPath();
+        ctx.rect(cx - secW / 2, cy - secH / 2, secW, secH);
+        ctx.fill();
+        ctx.stroke();
+
+        // Buckling Deflection Direction Arrows (Perpendicular to weak axis!)
+        if (behavior === "buckling") {
+          if (c.weakAxis === "Y") {
+            // Weak about Y-Y -> deflects left/right (X direction)
+            drawSimpleArrow(cx + secW / 2 + 6, cy, cx + secW / 2 + 34, cy, "#dc2626", 2.5);
+            drawSimpleArrow(cx - secW / 2 - 6, cy, cx - secW / 2 - 34, cy, "#dc2626", 2.5);
+          } else {
+            // Weak about X-X -> deflects up/down (Y direction)
+            drawSimpleArrow(cx, cy - secH / 2 - 6, cx, cy - secH / 2 - 34, "#dc2626", 2.5);
+            drawSimpleArrow(cx, cy + secH / 2 + 6, cx, cy + secH / 2 + 34, "#dc2626", 2.5);
+          }
+        }
+      }
+
+      // Axis End Labels
+      ctx.font = "bold 11px sans-serif";
+      ctx.fillStyle = xWeak && behavior === "buckling" ? "#dc2626" : "#475569";
+      ctx.fillText("X", cx + axisLen + 10, cy + 4);
+      ctx.fillStyle = yWeak && behavior === "buckling" ? "#dc2626" : "#475569";
+      ctx.fillText("Y", cx, cy - axisLen - 8);
+
+      // Footer Explanation inside HUD
+      const footerY = cy + boxH / 2 - 44;
+      ctx.font = "bold 11px sans-serif";
+      if (behavior === "crushing") {
+        ctx.fillStyle = "#b45309";
+        ctx.fillText("Uniform Axial Crushing", cx, footerY);
+        ctx.font = "10.5px sans-serif";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("Yielding occurs before axis instability", cx, footerY + 16);
+      } else if (c.weakAxis === "ISO") {
+        ctx.fillStyle = "#dc2626";
+        ctx.fillText("Isotropic Section (Ix = Iy)", cx, footerY);
+        ctx.font = "10.5px sans-serif";
+        ctx.fillStyle = "#64748b";
+        ctx.fillText("Equal stiffness; buckles in any direction", cx, footerY + 16);
+      } else {
+        ctx.fillStyle = "#dc2626";
+        ctx.fillText(`Weak Axis: ${c.weakAxis}-${c.weakAxis} (I_${c.weakAxis.toLowerCase()} is smaller)`, cx, footerY);
+        ctx.font = "10.5px sans-serif";
+        ctx.fillStyle = "#64748b";
+        const dirText = c.weakAxis === "Y" ? "Deflects perpendicular to Y-Y (↔)" : "Deflects perpendicular to X-X (↕)";
+        ctx.fillText(dirText, cx, footerY + 16);
+      }
+
+      ctx.restore();
+    }
+
+    function drawSimpleArrow(x1, y1, x2, y2, color, width) {
+      const angle = Math.atan2(y2 - y1, x2 - x1);
+      const head = 8;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - head * Math.cos(angle - Math.PI / 6), y2 - head * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(x2 - head * Math.cos(angle + Math.PI / 6), y2 - head * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPillBadge(text, x, y, color, filled = false) {
+      ctx.save();
+      ctx.font = "bold 11px sans-serif";
+      const w = ctx.measureText(text).width + 12;
+      ctx.fillStyle = filled ? color : "#ffffff";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x - w / 2, y - 9, w, 18, 5) : ctx.rect(x - w / 2, y - 9, w, 18);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = filled ? "#ffffff" : color;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, x, y);
+      ctx.restore();
+    }
+
+    // --- Event Listeners ---
+    matSelect.addEventListener("change", (e) => {
+      const mat = MATERIALS[e.target.value];
+      if (mat) {
+        inputE.value = mat.E;
+        inputSy.value = mat.sy;
+      }
+      recalculate();
+    });
+
+    [inputE, inputSy].forEach(el => {
+      el.addEventListener("input", () => {
+        matSelect.value = "custom";
+        recalculate();
+      });
+    });
+
+    selectBC.addEventListener("change", (e) => {
+      const kVal = BC_K_VALUES[e.target.value];
+      if (kVal !== undefined) {
+        inputK.value = kVal;
+        state.bc = e.target.value;
+        state.K = kVal;
+      } else {
+        state.bc = "custom";
+      }
+      recalculate();
+    });
+
+    inputK.addEventListener("input", () => {
+      state.K = parseFloat(inputK.value) || 1.0;
+      selectBC.value = "custom";
+      state.bc = "custom";
+      recalculate();
+    });
+
+    [inputA, unitA, inputL, unitL, inputIx, unitIx, inputIy, unitIy, inputP, unitP].forEach(el => {
+      el.addEventListener("input", recalculate);
+      el.addEventListener("change", recalculate);
+    });
+
+    // Animation Mode Pills
+    const btnModeGov = document.getElementById("btn-mode-governing");
+    const btnModeApp = document.getElementById("btn-mode-applied");
+
+    btnModeGov.addEventListener("click", () => {
+      state.animMode = "governing";
+      btnModeGov.classList.add("active");
+      btnModeApp.classList.remove("active");
+    });
+
+    btnModeApp.addEventListener("click", () => {
+      state.animMode = "applied";
+      btnModeApp.classList.add("active");
+      btnModeGov.classList.remove("active");
+    });
+
+    // Quick Educational Presets
+    document.getElementById("btn-preset-slender").addEventListener("click", () => {
+      // Industrial design polycarbonate slender strut (300mm long, 12x4 mm rectangular cross-section)
+      matSelect.value = "polycarbonate";
+      inputE.value = 2.4;
+      inputSy.value = 62;
+
+      inputA.value = 48; unitA.value = "mm2";
+      inputIx.value = 576; unitIx.value = "mm4";  // 4 * 12^3 / 12
+      inputIy.value = 64; unitIy.value = "mm4";   // 12 * 4^3 / 12
+      inputL.value = 300; unitL.value = "mm";
+
+      selectBC.value = "pinned_pinned";
+      inputK.value = 1.0; state.bc = "pinned_pinned"; state.K = 1.0;
+
+      inputP.value = 25; unitP.value = "N";
+      recalculate();
+    });
+
+    document.getElementById("btn-preset-stocky").addEventListener("click", () => {
+      // Short stocky steel column that crushes/yields before buckling
+      matSelect.value = "steel_a36";
+      inputE.value = 200;
+      inputSy.value = 250;
+
+      inputA.value = 4000; unitA.value = "mm2";
+      inputIx.value = 4500000; unitIx.value = "mm4";
+      inputIy.value = 3200000; unitIy.value = "mm4";
+      inputL.value = 0.8; unitL.value = "m";
+
+      selectBC.value = "fixed_pinned";
+      inputK.value = 0.7; state.bc = "fixed_pinned"; state.K = 0.7;
+
+      inputP.value = 1100; unitP.value = "kN";
+      recalculate();
+    });
+
+    document.getElementById("btn-preset-iso").addEventListener("click", () => {
+      // Isotropic circular aluminum tube (Ix = Iy -> 360-degree omnidirectional buckling)
+      matSelect.value = "alu_6061";
+      inputE.value = 68.9;
+      inputSy.value = 276;
+
+      inputA.value = 420; unitA.value = "mm2";
+      inputIx.value = 115000; unitIx.value = "mm4";
+      inputIy.value = 115000; unitIy.value = "mm4";
+      inputL.value = 2.2; unitL.value = "m";
+
+      selectBC.value = "pinned_pinned";
+      inputK.value = 1.0; state.bc = "pinned_pinned"; state.K = 1.0;
+
+      inputP.value = 12; unitP.value = "kN";
+      recalculate();
+    });
+
+    window.addEventListener("resize", () => {
+      drawSlendernessCurve();
+    });
+
+    // Boot
+    recalculate();
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+</html>
